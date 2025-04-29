@@ -40,3 +40,4 @@ You will need to go through organization validation with Open AI:
 To ensure this model is used responsibly, you may need to complete the API Organization Verification from your developer console before using gpt-image-1. (see below docs page)
 https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
 
+<img width="658" alt="Screenshot 2025-04-29 at 10 12 57 AM" src="https://github.com/user-attachments/assets/099d85f3-a6f5-4cfb-8dff-d2cd77bea40c" />
