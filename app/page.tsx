@@ -100,6 +100,7 @@ export default function Home() {
               onChange={handleImageChange}
               className="w-full p-2 border rounded"
             />
+<p className="text-xs text-gray-500 mt-1">Only PNG files under 4MB are supported.</p>
           </div>
 
           {previewImage && (
