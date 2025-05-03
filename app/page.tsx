@@ -38,6 +38,13 @@ export default function Home() {
         setError('Please upload an image file');
         return;
       }
+      
+      // Check if the image is in a supported format
+      if (!['image/png', 'image/jpeg', 'image/jpg', 'image/gif'].includes(file.type)) {
+        setError('Only PNG, JPG/JPEG, and GIF formats are supported');
+        return;
+      }
+      
       setImage(file);
       setEditedImage(null); // Clear previous edited image when new image is selected
     }
@@ -56,8 +63,8 @@ export default function Home() {
     try {
       const formData = new FormData();
       const imageData = await image.arrayBuffer();
-      const correctedName = image.name.endsWith('.png') ? image.name : image.name.replace(/\.[^/.]+$/, "") + ".png";
-      const imageFile = new File([imageData], correctedName, { type: 'image/png' });
+      // Use the original file with its native format
+      const imageFile = new File([imageData], image.name, { type: image.type });
       formData.append('image', imageFile);
       formData.append('description', description);
 
@@ -96,11 +103,11 @@ export default function Home() {
             <label className="block text-sm font-medium mb-2">Upload Image</label>
             <input
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg,image/gif"
               onChange={handleImageChange}
               className="w-full p-2 border rounded"
             />
-<p className="text-xs text-gray-500 mt-1">Only PNG files under 4MB are supported.</p>
+            <p className="text-xs text-gray-500 mt-1">Supported formats: PNG, JPG/JPEG, and GIF files under 4MB.</p>
           </div>
 
           {previewImage && (

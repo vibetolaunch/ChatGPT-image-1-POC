@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import sharp from 'sharp';
 
 // Instantiate OpenAI client
 const openai = new OpenAI({
@@ -24,25 +25,43 @@ export async function POST(request: Request) {
     // Log file size
     console.log(`Received image file size: ${imageFile.size} bytes`);
 
-    // OpenAI API specifically requires PNG for edit/variation.
-    // Check if the received file type is PNG and return error if not.
-    if (imageFile.type !== 'image/png') {
-        console.error(`Invalid file type: ${imageFile.type}. OpenAI requires image/png for variations/edits.`);
-        // Reject non-PNG uploads upfront
-        return NextResponse.json({ error: 'Invalid file type. Only image/png is supported.' }, { status: 400 });
+    // Check if the image is in a supported format
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/gif'].includes(imageFile.type)) {
+      console.error(`Invalid file type: ${imageFile.type}. Only PNG, JPG/JPEG, and GIF are supported.`);
+      return NextResponse.json({ error: 'Invalid file type. Only PNG, JPG/JPEG, and GIF are supported.' }, { status: 400 });
     }
 
-    console.log('Received image:', { name: imageFile.name, type: imageFile.type, size: imageFile.size });
+    // Convert non-PNG images to PNG for OpenAI API
+    let pngImageFile = imageFile;
+    if (imageFile.type !== 'image/png') {
+      console.log(`Converting ${imageFile.type} to PNG`);
+      try {
+        const arrayBuffer = await imageFile.arrayBuffer();
+        const pngBuffer = await sharp(Buffer.from(arrayBuffer))
+          .toFormat('png')
+          .toBuffer();
+        
+        // Create a new File with PNG format
+        const fileName = imageFile.name.replace(/\.[^/.]+$/, "") + ".png";
+        pngImageFile = new File([pngBuffer], fileName, { type: 'image/png' });
+        console.log(`Converted to PNG: ${pngImageFile.name}, size: ${pngImageFile.size} bytes`);
+      } catch (err) {
+        console.error('Error converting image to PNG:', err);
+        return NextResponse.json({ error: 'Failed to process the image format' }, { status: 500 });
+      }
+    }
+
+    console.log('Processed image:', { name: pngImageFile.name, type: pngImageFile.type, size: pngImageFile.size });
     console.log('Received description:', description);
 
     let result: OpenAI.Images.ImagesResponse;
 
     if (description && description.trim() !== "") {
       // --- Edit Image ---
-      console.log(`Calling openai.images.edit with File object: ${imageFile.name}`);
+      console.log(`Calling openai.images.edit with File object: ${pngImageFile.name}`);
       result = await openai.images.edit({
         model: "gpt-image-1",
-        image: imageFile, // Pass the File object directly
+        image: pngImageFile, // Use the PNG image
         prompt: description,
         n: 1,
         size: "1024x1024", 
@@ -51,9 +70,9 @@ export async function POST(request: Request) {
       console.log("OpenAI API Result:", JSON.stringify(result, null, 2)); // Log the full result object
     } else {
       // --- Create Variation ---
-      console.log(`Calling openai.images.createVariation with File object: ${imageFile.name}`);
+      console.log(`Calling openai.images.createVariation with File object: ${pngImageFile.name}`);
       result = await openai.images.createVariation({
-        image: imageFile, // Pass the File object directly
+        image: pngImageFile, // Use the PNG image
         n: 1,
         size: "1024x1024", 
         response_format: 'b64_json',
