@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import stripe from '../../../lib/stripe';
 import { getOrCreateSession } from '../../../lib/tokenService';
+import { headers } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
@@ -34,6 +35,12 @@ export async function POST(request: Request) {
     const unitPrice = 100; // $1.00 in cents
     const amount = tokenCount * unitPrice;
     
+    // Get the host from the request headers
+    const headersList = headers();
+    const host = headersList.get('host') || 'localhost:3000';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
+    
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -51,8 +58,8 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || ''}/checkout/success?session_id={CHECKOUT_SESSION_ID}&user_session=${userSession.id}&tokens=${tokenCount}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || ''}/checkout/cancel`,
+      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&user_session=${userSession.id}&tokens=${tokenCount}`,
+      cancel_url: `${baseUrl}/checkout/cancel`,
       metadata: {
         userSessionId: userSession.id,
         tokenCount: tokenCount.toString(),

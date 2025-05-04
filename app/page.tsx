@@ -23,12 +23,45 @@ export default function Home() {
   // On initial load, get or create a session
   useEffect(() => {
     const savedSessionId = localStorage.getItem('imageEditorSessionId');
-    console.log('Saved session ID from localStorage:', savedSessionId);
+    console.log('[DEBUG] Saved session ID from localStorage:', savedSessionId);
     
     if (savedSessionId) {
-      console.log('Using saved session ID:', savedSessionId);
+      console.log('[DEBUG] Using saved session ID:', savedSessionId);
       setSessionId(savedSessionId);
-      fetchTokenCount(savedSessionId);
+      
+      // First check localStorage for tokens (for immediate display)
+      try {
+        const storedSessions = localStorage.getItem('imageEditorSessions');
+        console.log('[DEBUG] Retrieved from localStorage:', storedSessions);
+        
+        if (storedSessions) {
+          const sessionsArray = JSON.parse(storedSessions);
+          console.log('[DEBUG] Parsed sessions:', sessionsArray);
+          
+          const userSession = sessionsArray.find((session: any) => session.id === savedSessionId);
+          console.log('[DEBUG] Found user session?', !!userSession, userSession);
+          
+          if (userSession && userSession.tokens !== undefined) {
+            console.log('[DEBUG] Found token count in localStorage:', userSession.tokens);
+            setTokenCount(userSession.tokens);
+            
+            // Sync with server to ensure consistency
+            syncTokensWithServer(savedSessionId, sessionsArray);
+          } else {
+            console.log('[DEBUG] No matching session found in localStorage or tokens undefined');
+            // Still fetch from server since we have a sessionId
+            fetchTokenCount(savedSessionId);
+          }
+        } else {
+          console.log('[DEBUG] No sessions found in localStorage');
+          // Still fetch from server since we have a sessionId
+          fetchTokenCount(savedSessionId);
+        }
+      } catch (err) {
+        console.error('[DEBUG] Error reading sessions from localStorage:', err);
+        // Fallback to server
+        fetchTokenCount(savedSessionId);
+      }
     } else {
       console.log('No saved session ID found, creating a new one');
       // Create a new session
@@ -52,15 +85,89 @@ export default function Home() {
     }
   }, []);
 
+  // Add a useEffect to refresh token count 1 second after component mounts
+  // This helps after redirects from payment success page
+  useEffect(() => {
+    // Only run if we have a sessionId
+    if (sessionId) {
+      // Wait a second to ensure any localStorage updates from other pages have settled
+      const timer = setTimeout(() => {
+        console.log('[DEBUG] Running delayed token refresh for session:', sessionId);
+        
+        // Check localStorage first
+        try {
+          const storedSessions = localStorage.getItem('imageEditorSessions');
+          if (storedSessions) {
+            const sessionsArray = JSON.parse(storedSessions);
+            const userSession = sessionsArray.find((session: any) => session.id === sessionId);
+            
+            if (userSession && userSession.tokens !== undefined) {
+              console.log('[DEBUG] Delayed refresh found tokens in localStorage:', userSession.tokens);
+              setTokenCount(userSession.tokens);
+            }
+          }
+        } catch (err) {
+          console.error('[DEBUG] Error in delayed localStorage check:', err);
+        }
+        
+        // Also get from server
+        fetchTokenCount(sessionId);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [sessionId]);
+
+  // Sync tokens between client and server
+  const syncTokensWithServer = async (sessionId: string, clientSessions: any[]) => {
+    console.log('[DEBUG] Syncing tokens with server for session:', sessionId);
+    try {
+      const response = await fetch('/api/sync-tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientSessions,
+          currentSessionId: sessionId
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('[DEBUG] Token sync response not OK:', response.status);
+        // Fallback to regular token fetch
+        fetchTokenCount(sessionId);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('[DEBUG] Token sync response:', data);
+      
+      if (data.tokenCount !== undefined) {
+        setTokenCount(data.tokenCount);
+        console.log('[DEBUG] Updated token count from sync:', data.tokenCount);
+      }
+    } catch (err) {
+      console.error('[DEBUG] Error syncing tokens:', err);
+      // Fallback to regular token fetch
+      fetchTokenCount(sessionId);
+    }
+  };
+
   // Fetch token count
   const fetchTokenCount = (sid: string) => {
+    console.log('[DEBUG] Fetching token count for session:', sid);
     fetch(`/api/tokens?sessionId=${sid}`)
-      .then(response => response.json())
+      .then(response => {
+        console.log('[DEBUG] Token fetch response status:', response.status);
+        return response.json();
+      })
       .then(data => {
+        console.log('[DEBUG] Token fetch response data:', data);
         setTokenCount(data.tokenCount || 0);
       })
       .catch(err => {
-        console.error('Error fetching token count:', err);
+        console.error('[DEBUG] Error fetching token count:', err);
       });
   };
 
