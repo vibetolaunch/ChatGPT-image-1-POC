@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
 import { convertFileToBase64 } from '../lib/utils';
 import { loadStripe } from '@stripe/stripe-js';
+import { featureFlags } from '../lib/config';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
@@ -319,34 +321,36 @@ export default function Home() {
         <h1 className="text-3xl font-bold mb-8">ChatGPT Image Editor</h1>
         
         {/* Token Information */}
-        <div className="bg-gray-100 p-4 rounded mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-semibold">Your Tokens</h2>
-              <p>Available: <span className="font-bold">{tokenCount}</span></p>
-              <p className="text-sm text-gray-600">Each image edit costs 1 token</p>
-            </div>
-            <div className="flex space-x-2 items-center">
-              <select 
-                value={purchaseAmount}
-                onChange={(e) => setPurchaseAmount(Number(e.target.value))}
-                className="border rounded p-2"
-              >
-                <option value={1}>1 Token</option>
-                <option value={5}>5 Tokens</option>
-                <option value={10}>10 Tokens</option>
-                <option value={25}>25 Tokens</option>
-              </select>
-              <button
-                onClick={handlePurchaseTokens}
-                disabled={checkoutLoading}
-                className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
-              >
-                {checkoutLoading ? 'Processing...' : 'Purchase'}
-              </button>
+        {featureFlags.showTokenPurchase && (
+          <div className="bg-gray-100 p-4 rounded mb-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-semibold">Your Tokens</h2>
+                <p>Available: <span className="font-bold">{tokenCount}</span></p>
+                <p className="text-sm text-gray-600">Each image edit costs 1 token</p>
+              </div>
+              <div className="flex space-x-2 items-center">
+                <select 
+                  value={purchaseAmount}
+                  onChange={(e) => setPurchaseAmount(Number(e.target.value))}
+                  className="border rounded p-2"
+                >
+                  <option value={1}>1 Token</option>
+                  <option value={5}>5 Tokens</option>
+                  <option value={10}>10 Tokens</option>
+                  <option value={25}>25 Tokens</option>
+                </select>
+                <button
+                  onClick={handlePurchaseTokens}
+                  disabled={checkoutLoading}
+                  className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+                >
+                  {checkoutLoading ? 'Processing...' : 'Purchase'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -386,10 +390,17 @@ export default function Home() {
 
           <button
             type="submit"
-            disabled={loading || tokenCount <= 0}
+            disabled={loading || (featureFlags.showTokenPurchase && tokenCount <= 0)}
             className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:bg-blue-300"
           >
-            {loading ? 'Processing...' : tokenCount <= 0 ? 'Purchase Tokens to Continue' : description.trim() ? 'Edit Image' : 'Create Variation'}
+            {loading 
+              ? 'Processing...' 
+              : (featureFlags.showTokenPurchase && tokenCount <= 0) 
+                ? 'Purchase Tokens to Continue' 
+                : description.trim() 
+                  ? 'Edit Image' 
+                  : 'Create Variation'
+            }
           </button>
         </form>
 

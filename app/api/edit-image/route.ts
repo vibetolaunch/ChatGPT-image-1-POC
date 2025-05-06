@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { useToken } from '../../../lib/tokenService';
+import { featureFlags } from '../../../lib/config';
 
 // Instantiate OpenAI client
 const openai = new OpenAI({
@@ -28,13 +29,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // Check if the user has available tokens
-    const hasTokens = useToken(sessionId);
-    if (!hasTokens) {
-      return NextResponse.json({ 
-        error: 'No tokens available. Please purchase tokens to use this feature.',
-        needTokens: true 
-      }, { status: 402 }); // 402 Payment Required
+    // Only check tokens if the token purchase feature is enabled
+    if (featureFlags.showTokenPurchase) {
+      // Check if the user has available tokens
+      const hasTokens = useToken(sessionId);
+      if (!hasTokens) {
+        return NextResponse.json({ 
+          error: 'No tokens available. Please purchase tokens to use this feature.',
+          needTokens: true 
+        }, { status: 402 }); // 402 Payment Required
+      }
     }
 
     // Log file size
