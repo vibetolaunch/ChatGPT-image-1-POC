@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         image: pngImageFile, // Use the PNG image
         prompt: description,
         n: 1,
-        size: "1024x1024", 
+        size: "1024x1024"
       });
       console.log("Image edit result received.");
       console.log("OpenAI API Result:", JSON.stringify(result, null, 2)); // Log the full result object
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         image: pngImageFile, // Use the PNG image
         n: 1,
         size: "1024x1024", 
-        response_format: 'b64_json',
+        response_format: 'b64_json'
       });
       console.log("Image variation result received.");
     }
