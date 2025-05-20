@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import ImageComparisonSlider from '../components/ImageComparisonSlider'
+import ClientWrapper from './ClientWrapper'
 
 export default async function ImageComparisonPage() {
   const supabase = await createServerSupabaseClient()
@@ -22,6 +23,9 @@ export default async function ImageComparisonPage() {
           afterImage="/house-dark.png"
         />
       </div>
+
+      {/* Client-side components wrapper */}
+      <ClientWrapper />
 
       {/* Hidden overlay content - just placeholders for scrolling */}
       <div className="relative z-10 opacity-0">

@@ -69,12 +69,15 @@ export default function ImageComparisonSlider({ beforeImage, afterImage }: Image
 
       {/* Slider Line */}
       <div 
-        className="absolute left-0 right-0 h-1 bg-white/50 backdrop-blur-sm"
-        style={{ top: `${sliderPosition}%` }}
+        className="absolute left-0 right-0 h-2 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 backdrop-blur-sm overflow-hidden"
+        style={{ 
+          top: `${sliderPosition}%`,
+          boxShadow: '0 0 10px 2px rgba(156, 39, 176, 0.7), 0 0 20px 4px rgba(32, 156, 238, 0.5)'
+        }}
       >
         {/* Slider Handle */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center">
-          <div className="w-6 h-6 bg-gray-200/80 rounded-full" />
+          <div className="w-6 h-6 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full" />
         </div>
       </div>
     </div>
