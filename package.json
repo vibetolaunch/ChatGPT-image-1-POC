@@ -6,17 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:migrate": "node lib/supabase/migrate.js"
   },
   "dependencies": {
     "@stripe/stripe-js": "^2.4.0",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
     "@types/uuid": "^10.0.0",
     "axios": "^1.6.7",
     "form-data": "^4.0.2",
-    "next": "^14.2.28",
+    "next": "^15.3.2",
     "openai": "^4.96.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-dropzone": "^14.3.8",
     "sharp": "^0.34.1",
     "stripe": "^14.25.0",
     "uuid": "^11.1.0"
@@ -26,6 +30,7 @@
     "@types/react": "^18.2.57",
     "@types/react-dom": "^18.2.19",
     "autoprefixer": "^10.4.17",
+    "dotenv": "^16.5.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"

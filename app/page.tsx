@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { convertFileToBase64 } from '../lib/utils';
 import { loadStripe } from '@stripe/stripe-js';
 import { featureFlags } from '../lib/config';
+import UserImages from './components/UserImages';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
@@ -316,113 +317,156 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">ChatGPT Image Editor</h1>
-        
-        {/* Token Information */}
-        {featureFlags.showTokenPurchase && (
-          <div className="bg-gray-100 p-4 rounded mb-6">
-            <div className="flex justify-between items-center">
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Token Purchase Section */}
+        <div className="bg-white shadow sm:rounded-lg mb-8">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              Available Tokens: {tokenCount}
+            </h3>
+            <div className="mt-2 max-w-xl text-sm text-gray-500">
+              <p>Purchase tokens to edit your images.</p>
+            </div>
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={handlePurchaseTokens}
+                disabled={checkoutLoading}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {checkoutLoading ? 'Processing...' : 'Purchase Tokens'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Image Upload Section */}
+        <div className="bg-white shadow sm:rounded-lg mb-8">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+              Upload and Edit Image
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Your Tokens</h2>
-                <p>Available: <span className="font-bold">{tokenCount}</span></p>
-                <p className="text-sm text-gray-600">Each image edit costs 1 token</p>
+                <label className="block text-sm font-medium text-gray-700">
+                  Image
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                  <div className="space-y-1 text-center">
+                    {previewImage ? (
+                      <div className="relative h-48 w-full">
+                        <Image
+                          src={previewImage}
+                          alt="Preview"
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 48 48"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                    <div className="flex text-sm text-gray-600">
+                      <label
+                        htmlFor="file-upload"
+                        className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                      >
+                        <span>Upload a file</span>
+                        <input
+                          id="file-upload"
+                          name="file-upload"
+                          type="file"
+                          className="sr-only"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                        />
+                      </label>
+                      <p className="pl-1">or drag and drop</p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, GIF up to 10MB
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex space-x-2 items-center">
-                <select 
-                  value={purchaseAmount}
-                  onChange={(e) => setPurchaseAmount(Number(e.target.value))}
-                  className="border rounded p-2"
+
+              <div>
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-medium text-gray-700"
                 >
-                  <option value={1}>1 Token</option>
-                  <option value={5}>5 Tokens</option>
-                  <option value={10}>10 Tokens</option>
-                  <option value={25}>25 Tokens</option>
-                </select>
+                  Description
+                </label>
+                <div className="mt-1">
+                  <textarea
+                    id="description"
+                    name="description"
+                    rows={3}
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe how you want to edit the image..."
+                  />
+                </div>
+              </div>
+
+              <div>
                 <button
-                  onClick={handlePurchaseTokens}
-                  disabled={checkoutLoading}
-                  className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+                  type="submit"
+                  disabled={!image || !description || loading}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
-                  {checkoutLoading ? 'Processing...' : 'Purchase'}
+                  {loading ? 'Processing...' : 'Edit Image'}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
+            </form>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-2">Upload Image</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/jpg,image/gif"
-              onChange={handleImageChange}
-              className="w-full p-2 border rounded"
-            />
-            <p className="text-xs text-gray-500 mt-1">Supported formats: PNG, JPG/JPEG, and GIF files under 4MB.</p>
-          </div>
-
-          {previewImage && (
-            <div className="mt-4">
-              <h2 className="text-lg font-medium mb-2">Image Preview</h2>
-              <div className="relative w-full h-64 border rounded overflow-hidden">
-                <Image
-                  src={previewImage}
-                  alt="Upload preview"
-                  fill
-                  className="object-contain"
-                />
+            {error && (
+              <div className="mt-4 text-sm text-red-600">
+                {error}
               </div>
-            </div>
-          )}
+            )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Edit Description (optional for variations)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-2 border rounded h-32"
-              placeholder="Describe how you want to edit the image, or leave empty for variations"
-            />
+            {editedImage && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Edited Image:
+                </h4>
+                <div className="relative h-64 w-full">
+                  <Image
+                    src={editedImage}
+                    alt="Edited"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            )}
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading || (featureFlags.showTokenPurchase && tokenCount <= 0)}
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:bg-blue-300"
-          >
-            {loading 
-              ? 'Processing...' 
-              : (featureFlags.showTokenPurchase && tokenCount <= 0) 
-                ? 'Purchase Tokens to Continue' 
-                : description.trim() 
-                  ? 'Edit Image' 
-                  : 'Create Variation'
-            }
-          </button>
-        </form>
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-            {error}
+        {/* User's Images Section */}
+        <div className="bg-white shadow sm:rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+              Your Images
+            </h3>
+            <UserImages />
           </div>
-        )}
-
-        {editedImage && (
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Edited Image</h2>
-            <div className="relative w-full h-96">
-              <Image
-                src={editedImage}
-                alt="Edited result"
-                fill
-                className="object-contain"
-              />
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </main>
   );

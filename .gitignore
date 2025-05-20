@@ -1,3 +1,6 @@
 node_modules
 .env.local
 .next
+# Supabase
+**/supabase/.branches
+**/supabase/.temp
