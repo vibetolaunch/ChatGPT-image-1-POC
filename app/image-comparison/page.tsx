@@ -21,6 +21,7 @@ export default async function ImageComparisonPage() {
         <ImageComparisonSlider 
           beforeImage="/house-light.png"
           afterImage="/house-dark.png"
+          zoomLevel={0.7} // Zoom out to 70% of original size
         />
       </div>
 
