@@ -6,7 +6,7 @@ interface FeatureFlags {
 // Feature flags that control application behavior
 export const featureFlags: FeatureFlags = {
   // Set to false to hide the token purchase UI
-  showTokenPurchase: true,
+  showTokenPurchase: false,
 };
 
 // Environment variables and configuration settings
@@ -18,4 +18,4 @@ export const supabaseConfig = {
   databaseUrl: process.env.DATABASE_URL || ''
 }
 
-// Other configuration settings can be added here 
+// Other configuration settings can be added here

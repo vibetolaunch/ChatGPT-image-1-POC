@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import LogoutButton from '@/app/components/LogoutButton';
 
 export const metadata: Metadata = {
@@ -43,4 +43,4 @@ export default async function RootLayout({
       </body>
     </html>
   );
-} 
+}

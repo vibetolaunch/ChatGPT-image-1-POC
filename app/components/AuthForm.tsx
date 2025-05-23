@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClientSupabaseClient } from '@/lib/supabase'
 
 export default function AuthForm() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -41,6 +43,8 @@ export default function AuthForm() {
 
         if (error) throw error
         setMessage('Successfully signed in')
+        // Redirect to image editor after successful sign-in
+        router.push('/image-mask-editor')
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred')
@@ -120,4 +124,4 @@ export default function AuthForm() {
       </div>
     </div>
   )
-} 
+}
