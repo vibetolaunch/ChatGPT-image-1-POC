@@ -116,12 +116,12 @@ export async function POST(request: Request) {
     const imageUrl = result.data?.[0]?.url;
     const imageB64Json = result.data?.[0]?.b64_json;
 
-    let resultBufferNode: Buffer;
+    let openaiResultBuffer: Buffer;
 
     if (imageB64Json) {
       // Handle base64 response
       console.log('Processing base64 image response from OpenAI');
-      resultBufferNode = Buffer.from(imageB64Json, 'base64');
+      openaiResultBuffer = Buffer.from(imageB64Json, 'base64');
     } else if (imageUrl) {
       // Handle URL response
       console.log('Processing URL image response from OpenAI');
@@ -131,11 +131,49 @@ export async function POST(request: Request) {
       }
       
       const resultBuffer = await imageResponse.arrayBuffer();
-      resultBufferNode = Buffer.from(resultBuffer);
+      openaiResultBuffer = Buffer.from(resultBuffer);
     } else {
       console.error('No image URL or base64 data found in OpenAI response:', result);
       throw new Error('Failed to retrieve image data from OpenAI');
     }
+
+    console.log('Compositing OpenAI result with original image...');
+    
+    // Composite the OpenAI result with the original image using the mask
+    // Step 1: Resize OpenAI result to match original image dimensions
+    const resizedOpenaiResult = await sharp(openaiResultBuffer)
+      .resize(originalWidth, originalHeight, { 
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3 
+      })
+      .toFormat('png')
+      .toBuffer();
+
+    // Step 2: Use the mask as an alpha channel to composite the images
+    // Convert mask to grayscale and use it as alpha channel for the OpenAI result
+    const maskAsAlpha = await sharp(processedMaskBuffer)
+      .greyscale()
+      .toBuffer();
+
+    // Step 3: Create RGBA version of OpenAI result with mask as alpha channel
+    const openaiWithAlpha = await sharp(resizedOpenaiResult)
+      .ensureAlpha()
+      .composite([{
+        input: maskAsAlpha,
+        blend: 'dest-in'
+      }])
+      .toBuffer();
+
+    // Step 4: Composite the masked OpenAI result over the original image
+    const resultBufferNode = await sharp(imageBuffer)
+      .composite([{
+        input: openaiWithAlpha,
+        blend: 'over'
+      }])
+      .toFormat('png')
+      .toBuffer();
+
+    console.log('Image compositing completed successfully');
 
     // Save the mask image to Supabase Storage
     const maskFileName = `${user.id}-mask-${Date.now()}.png`;
