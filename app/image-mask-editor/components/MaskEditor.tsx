@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import Image from 'next/image'
 
 interface MaskEditorProps {
   imageUrl: string
@@ -11,11 +10,42 @@ interface MaskEditorProps {
 export default function MaskEditor({ imageUrl, onMaskCreated }: MaskEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [brushSize, setBrushSize] = useState(20)
+  const [brushSize, setBrushSize] = useState(35)
   const [brushOpacity, setBrushOpacity] = useState(1)
   const [isImageLoaded, setIsImageLoaded] = useState(false)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  
+  // Calculate responsive canvas dimensions
+  const calculateCanvasSize = (naturalWidth: number, naturalHeight: number) => {
+    const container = containerRef.current
+    if (!container) return { width: naturalWidth, height: naturalHeight }
+    
+    const containerRect = container.getBoundingClientRect()
+    const containerWidth = containerRect.width - 32 // Account for padding
+    const aspectRatio = naturalWidth / naturalHeight
+    
+    // Set responsive max dimensions based on screen size
+    const maxWidth = Math.min(containerWidth, window.innerWidth < 768 ? 320 : window.innerWidth < 1024 ? 400 : 600)
+    const maxHeight = window.innerWidth < 768 ? 400 : 500
+    
+    let displayWidth = naturalWidth
+    let displayHeight = naturalHeight
+    
+    // Resize if image is too large for display
+    if (displayWidth > maxWidth) {
+      displayWidth = maxWidth
+      displayHeight = displayWidth / aspectRatio
+    }
+    
+    if (displayHeight > maxHeight) {
+      displayHeight = maxHeight
+      displayWidth = displayHeight * aspectRatio
+    }
+    
+    return { width: displayWidth, height: displayHeight }
+  }
   
   // Initialize canvas when image is loaded
   useEffect(() => {
@@ -27,26 +57,10 @@ export default function MaskEditor({ imageUrl, onMaskCreated }: MaskEditorProps)
       
       // Set canvas size to match image dimensions
       if (canvasRef.current) {
-        // Calculate aspect ratio
-        const aspectRatio = image.naturalWidth / image.naturalHeight
-        
-        // Set max dimensions for display
-        const maxWidth = 800
-        const maxHeight = 600
-        
-        let displayWidth = image.naturalWidth
-        let displayHeight = image.naturalHeight
-        
-        // Resize if image is too large for display
-        if (displayWidth > maxWidth) {
-          displayWidth = maxWidth
-          displayHeight = displayWidth / aspectRatio
-        }
-        
-        if (displayHeight > maxHeight) {
-          displayHeight = maxHeight
-          displayWidth = displayHeight * aspectRatio
-        }
+        const { width: displayWidth, height: displayHeight } = calculateCanvasSize(
+          image.naturalWidth, 
+          image.naturalHeight
+        )
         
         setCanvasSize({ width: displayWidth, height: displayHeight })
         
@@ -65,12 +79,24 @@ export default function MaskEditor({ imageUrl, onMaskCreated }: MaskEditorProps)
       }
     }
     
+    const handleResize = () => {
+      if (image && isImageLoaded) {
+        const { width: displayWidth, height: displayHeight } = calculateCanvasSize(
+          image.naturalWidth, 
+          image.naturalHeight
+        )
+        setCanvasSize({ width: displayWidth, height: displayHeight })
+      }
+    }
+    
     image.addEventListener('load', handleImageLoad)
+    window.addEventListener('resize', handleResize)
     
     return () => {
       image.removeEventListener('load', handleImageLoad)
+      window.removeEventListener('resize', handleResize)
     }
-  }, [imageUrl])
+  }, [imageUrl, isImageLoaded])
   
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -135,84 +161,144 @@ export default function MaskEditor({ imageUrl, onMaskCreated }: MaskEditorProps)
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-6">
-        <div className="flex-1">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Original Image</h3>
-          <div className="relative" style={{ width: canvasSize.width, height: canvasSize.height }}>
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt="Original"
-              className="absolute top-0 left-0 w-full h-full object-contain"
-              style={{ zIndex: 1 }}
-            />
+    <div ref={containerRef} className="space-y-6 w-full">
+      {/* Mobile-first responsive layout */}
+      <div className="flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:space-x-6">
+        {/* Original Image Section */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Original Image</h3>
+          <div className="flex justify-center">
+            <div 
+              className="relative border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
+              style={{ 
+                width: canvasSize.width || 'auto', 
+                height: canvasSize.height || 'auto',
+                maxWidth: '100%'
+              }}
+            >
+              <img
+                ref={imageRef}
+                src={imageUrl}
+                alt="Original"
+                className="w-full h-full object-contain"
+                style={{ display: isImageLoaded ? 'block' : 'none' }}
+              />
+              {!isImageLoaded && (
+                <div className="flex items-center justify-center h-48 bg-gray-100">
+                  <div className="text-gray-500">Loading...</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
-        <div className="flex-1">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Draw Mask</h3>
-          <div className="relative" style={{ width: canvasSize.width, height: canvasSize.height }}>
-            <img
-              src={imageUrl}
-              alt="Background"
-              className="absolute top-0 left-0 w-full h-full object-contain opacity-50"
-              style={{ zIndex: 1 }}
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 cursor-crosshair"
+        {/* Mask Drawing Section */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Draw Mask</h3>
+          <div className="flex justify-center">
+            <div 
+              className="relative border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
               style={{ 
-                zIndex: 2,
-                width: canvasSize.width,
-                height: canvasSize.height
+                width: canvasSize.width || 'auto', 
+                height: canvasSize.height || 'auto',
+                maxWidth: '100%'
               }}
-              onMouseDown={startDrawing}
-              onMouseUp={stopDrawing}
-              onMouseMove={draw}
-              onMouseLeave={stopDrawing}
-            />
+            >
+              <img
+                src={imageUrl}
+                alt="Background"
+                className="absolute top-0 left-0 w-full h-full object-contain opacity-50"
+                style={{ 
+                  zIndex: 1,
+                  display: isImageLoaded ? 'block' : 'none'
+                }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 cursor-crosshair touch-none"
+                style={{ 
+                  zIndex: 2,
+                  width: canvasSize.width || 'auto',
+                  height: canvasSize.height || 'auto',
+                  display: isImageLoaded ? 'block' : 'none'
+                }}
+                onMouseDown={startDrawing}
+                onMouseUp={stopDrawing}
+                onMouseMove={draw}
+                onMouseLeave={stopDrawing}
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  const touch = e.touches[0]
+                  const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                  })
+                  startDrawing(mouseEvent as any)
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  stopDrawing()
+                }}
+                onTouchMove={(e) => {
+                  e.preventDefault()
+                  const touch = e.touches[0]
+                  const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                  })
+                  draw(mouseEvent as any)
+                }}
+              />
+              {!isImageLoaded && (
+                <div className="flex items-center justify-center h-48 bg-gray-100">
+                  <div className="text-gray-500">Loading...</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="brush-size" className="block text-sm font-medium text-gray-700">
-            Brush Size: {brushSize}px
-          </label>
-          <input
-            type="range"
-            id="brush-size"
-            min="1"
-            max="50"
-            value={brushSize}
-            onChange={(e) => setBrushSize(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
+      {/* Controls Section */}
+      <div className="space-y-4 max-w-2xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="brush-size" className="block text-sm font-medium text-gray-700 mb-2">
+              Brush Size: {brushSize}px
+            </label>
+            <input
+              type="range"
+              id="brush-size"
+              min="5"
+              max="100"
+              value={brushSize}
+              onChange={(e) => setBrushSize(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="brush-opacity" className="block text-sm font-medium text-gray-700 mb-2">
+              Brush Opacity: {Math.round(brushOpacity * 100)}%
+            </label>
+            <input
+              type="range"
+              id="brush-opacity"
+              min="0.1"
+              max="1"
+              step="0.1"
+              value={brushOpacity}
+              onChange={(e) => setBrushOpacity(parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            />
+          </div>
         </div>
         
-        <div>
-          <label htmlFor="brush-opacity" className="block text-sm font-medium text-gray-700">
-            Brush Opacity: {Math.round(brushOpacity * 100)}%
-          </label>
-          <input
-            type="range"
-            id="brush-opacity"
-            min="0.1"
-            max="1"
-            step="0.1"
-            value={brushOpacity}
-            onChange={(e) => setBrushOpacity(parseFloat(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-        </div>
-        
-        <div className="flex space-x-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <button
             type="button"
             onClick={clearMask}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
           >
             Clear Mask
           </button>
@@ -220,14 +306,15 @@ export default function MaskEditor({ imageUrl, onMaskCreated }: MaskEditorProps)
           <button
             type="button"
             onClick={saveMask}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
           >
             Continue with Mask
           </button>
         </div>
       </div>
       
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+      {/* Instructions */}
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 max-w-2xl mx-auto">
         <div className="flex">
           <div className="flex-shrink-0">
             <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

@@ -24,6 +24,7 @@
     "react-dropzone": "^14.3.8",
     "sharp": "^0.34.1",
     "stripe": "^14.25.0",
+    "tldraw": "^3.13.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

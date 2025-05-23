@@ -5,34 +5,72 @@ import Image from 'next/image'
 
 interface ResultDisplayProps {
   originalImageUrl: string
-  resultImageUrl: string
+  resultImages: Array<{
+    url: string
+    path: string
+    optionNumber: number
+  }>
+  selectedImageIndex: number
   prompt: string
   onReset: () => void
+  onImageSelection: (index: number) => void
 }
 
 export default function ResultDisplay({
   originalImageUrl,
-  resultImageUrl,
+  resultImages,
+  selectedImageIndex,
   prompt,
-  onReset
+  onReset,
+  onImageSelection
 }: ResultDisplayProps) {
   const [showOriginal, setShowOriginal] = useState(false)
+  
+  const selectedImage = resultImages[selectedImageIndex]
   
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Result</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Results</h3>
         <p className="text-sm text-gray-500 mb-4">
           Your image has been processed with the prompt: <span className="font-medium italic">"{prompt}"</span>
         </p>
+        <p className="text-sm text-gray-600 mb-4">
+          Generated {resultImages.length} options. Click on the thumbnails below to switch between them.
+        </p>
+      </div>
+      
+      {/* Image options selector */}
+      <div className="flex gap-3 mb-6">
+        {resultImages.map((image, index) => (
+          <button
+            key={index}
+            onClick={() => onImageSelection(index)}
+            className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+              selectedImageIndex === index 
+                ? 'border-indigo-500 ring-2 ring-indigo-200' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Image
+              src={image.url}
+              alt={`Option ${image.optionNumber}`}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs py-1 text-center">
+              Option {image.optionNumber}
+            </div>
+          </button>
+        ))}
       </div>
       
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-1 relative">
           <div className="relative h-80 w-full">
             <Image
-              src={showOriginal ? originalImageUrl : resultImageUrl}
-              alt={showOriginal ? "Original Image" : "Edited Image"}
+              src={showOriginal ? originalImageUrl : selectedImage.url}
+              alt={showOriginal ? "Original Image" : `Edited Image - Option ${selectedImage.optionNumber}`}
               fill
               className="object-contain rounded-lg"
             />
@@ -63,17 +101,42 @@ export default function ResultDisplay({
                 <dt className="text-sm font-medium text-gray-500">Model</dt>
                 <dd className="mt-1 text-sm text-gray-900">GPT-Image-1</dd>
               </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Selected Option</dt>
+                <dd className="mt-1 text-sm text-gray-900">Option {selectedImage.optionNumber} of {resultImages.length}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Quality</dt>
+                <dd className="mt-1 text-sm text-gray-900">Low (for faster generation)</dd>
+              </div>
             </dl>
           </div>
           
           <div className="space-y-3">
             <a
-              href={resultImageUrl}
-              download="edited-image.png"
+              href={selectedImage.url}
+              download={`edited-image-option-${selectedImage.optionNumber}.png`}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full justify-center"
             >
-              Download Image
+              Download Selected Image
             </a>
+            
+            {/* Download all images */}
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500 text-center">Or download individual options:</p>
+              <div className="grid grid-cols-3 gap-2">
+                {resultImages.map((image, index) => (
+                  <a
+                    key={index}
+                    href={image.url}
+                    download={`edited-image-option-${image.optionNumber}.png`}
+                    className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-indigo-500 justify-center"
+                  >
+                    Option {image.optionNumber}
+                  </a>
+                ))}
+              </div>
+            </div>
             
             <button
               type="button"
@@ -95,7 +158,7 @@ export default function ResultDisplay({
           </div>
           <div className="ml-3">
             <p className="text-sm text-green-700">
-              Your image has been successfully processed! You can download it or start over with a new image.
+              Your images have been successfully processed! You generated {resultImages.length} options. Select your favorite and download it, or download all options to compare them later.
             </p>
           </div>
         </div>
