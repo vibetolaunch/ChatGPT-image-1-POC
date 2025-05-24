@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import TldrawMaskEditor from './components/TldrawMaskEditor'
+import UnifiedPaintingCanvas from './components/UnifiedPaintingCanvas'
 
 export default async function ImageMaskEditorPage() {
   const supabase = await createServerSupabaseClient()
@@ -13,5 +13,5 @@ export default async function ImageMaskEditorPage() {
     redirect('/login')
   }
   
-  return <TldrawMaskEditor />
+  return <UnifiedPaintingCanvas />
 }

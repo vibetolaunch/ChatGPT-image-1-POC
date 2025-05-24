@@ -247,6 +247,212 @@ export default function TldrawMaskEditor({}: TldrawMaskEditorProps) {
     disabled: isUploading
   })
 
+  // Helper function to extract mask from tldraw shapes
+  const extractMaskFromShapes = async (): Promise<string | null> => {
+    if (!tldrawEditor || !editorState.originalImage) {
+      return null
+    }
+
+    try {
+      // Get all shapes on the current page
+      const shapes = tldrawEditor.getCurrentPageShapes()
+      
+      // Filter out the image shape and only get drawing shapes (draw, geo, etc.)
+      const drawingShapes = shapes.filter(shape => 
+        shape.type !== 'image' && 
+        (shape.type === 'draw' || shape.type === 'geo' || shape.type === 'highlight')
+      )
+
+      // TEMPORARY TEST: Create a simple test mask instead of using drawn shapes
+      console.log('Creating test mask - small white rectangle in center')
+      
+      // Create a canvas for the mask with original image dimensions
+      const maskCanvas = document.createElement('canvas')
+      maskCanvas.width = editorState.originalImage.width
+      maskCanvas.height = editorState.originalImage.height
+      const maskCtx = maskCanvas.getContext('2d')
+      
+      if (!maskCtx) {
+        throw new Error('Could not create mask canvas context')
+      }
+
+      // Fill with black (areas to preserve)
+      maskCtx.fillStyle = '#000000'
+      maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
+
+      // Add a small white rectangle in the center (area to edit)
+      maskCtx.fillStyle = '#ffffff'
+      const testRectSize = Math.min(editorState.originalImage.width, editorState.originalImage.height) * 0.2
+      const centerX = editorState.originalImage.width / 2 - testRectSize / 2
+      const centerY = editorState.originalImage.height / 2 - testRectSize / 2
+      maskCtx.fillRect(centerX, centerY, testRectSize, testRectSize)
+
+      console.log('Test mask created:', {
+        imageSize: { width: editorState.originalImage.width, height: editorState.originalImage.height },
+        testRect: { x: centerX, y: centerY, size: testRectSize }
+      })
+
+      // Convert canvas to data URL
+      const maskImageData = maskCanvas.toDataURL('image/png')
+      console.log('Test mask generated successfully')
+      
+      return maskImageData
+
+      // OLD CODE BELOW - COMMENTED OUT FOR TESTING
+      /*
+      if (drawingShapes.length === 0) {
+        throw new Error('No mask drawn. Please draw on the image to create a mask.')
+      }
+
+      console.log(`Found ${drawingShapes.length} drawing shapes for mask`)
+
+      // Find the image shape to get its bounds
+      const imageShape = shapes.find(shape => shape.type === 'image')
+      if (!imageShape) {
+        throw new Error('Original image not found on canvas')
+      }
+
+      // Get image shape bounds
+      const imageShapeBounds = tldrawEditor.getShapeGeometry(imageShape).bounds
+      const imageShapePageBounds = tldrawEditor.getShapePageBounds(imageShape)
+      
+      if (!imageShapePageBounds) {
+        throw new Error('Could not determine image position on canvas')
+      }
+
+      console.log('Image bounds:', {
+        canvas: imageShapePageBounds,
+        geometry: imageShapeBounds,
+        originalSize: { width: editorState.originalImage.width, height: editorState.originalImage.height }
+      })
+
+      // Create a canvas for the mask with original image dimensions
+      const maskCanvas = document.createElement('canvas')
+      maskCanvas.width = editorState.originalImage.width
+      maskCanvas.height = editorState.originalImage.height
+      const maskCtx = maskCanvas.getContext('2d')
+      
+      if (!maskCtx) {
+        throw new Error('Could not create mask canvas context')
+      }
+
+      // Fill with black (areas to preserve)
+      maskCtx.fillStyle = '#000000'
+      maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
+
+      // Set up for drawing white mask areas
+      maskCtx.fillStyle = '#ffffff'
+      maskCtx.strokeStyle = '#ffffff'
+
+      // Calculate scale factors from canvas coordinates to image pixel coordinates
+      const scaleX = editorState.originalImage.width / imageShapePageBounds.width
+      const scaleY = editorState.originalImage.height / imageShapePageBounds.height
+
+      console.log('Scale factors:', { scaleX, scaleY })
+
+      // Process each drawing shape
+      for (const shape of drawingShapes) {
+        const shapePageBounds = tldrawEditor.getShapePageBounds(shape)
+        if (!shapePageBounds) continue
+
+        // Calculate relative position within the image
+        const relativeX = shapePageBounds.x - imageShapePageBounds.x
+        const relativeY = shapePageBounds.y - imageShapePageBounds.y
+
+        // Skip shapes that are outside the image bounds
+        if (relativeX < 0 || relativeY < 0 || 
+            relativeX > imageShapePageBounds.width || 
+            relativeY > imageShapePageBounds.height) {
+          console.log('Skipping shape outside image bounds:', shape.type)
+          continue
+        }
+
+        // Convert to image pixel coordinates
+        const maskX = relativeX * scaleX
+        const maskY = relativeY * scaleY
+        const maskWidth = shapePageBounds.width * scaleX
+        const maskHeight = shapePageBounds.height * scaleY
+
+        console.log(`Processing ${shape.type} shape:`, {
+          canvasPos: { x: shapePageBounds.x, y: shapePageBounds.y },
+          relativePos: { x: relativeX, y: relativeY },
+          maskPos: { x: maskX, y: maskY, width: maskWidth, height: maskHeight }
+        })
+
+        // Draw the shape on the mask based on its type
+        if (shape.type === 'draw') {
+          // For draw shapes, we need to render the actual path
+          try {
+            // Get the shape's SVG path data
+            const geometry = tldrawEditor.getShapeGeometry(shape)
+            if (geometry && 'segments' in geometry) {
+              // Draw brush strokes
+              maskCtx.lineWidth = Math.max(2, 10 * Math.min(scaleX, scaleY))
+              maskCtx.lineCap = 'round'
+              maskCtx.lineJoin = 'round'
+              
+              maskCtx.beginPath()
+              // This is a simplified approach - for production, you'd want to properly parse the draw shape's segments
+              maskCtx.arc(maskX + maskWidth/2, maskY + maskHeight/2, Math.max(maskWidth, maskHeight)/2, 0, 2 * Math.PI)
+              maskCtx.fill()
+            }
+          } catch (err) {
+            console.warn('Could not render draw shape, using fallback rectangle:', err)
+            maskCtx.fillRect(maskX, maskY, maskWidth, maskHeight)
+          }
+        } else if (shape.type === 'geo') {
+          // For geometric shapes
+          const geoShape = shape as any
+          if (geoShape.props?.geo === 'rectangle' || !geoShape.props?.geo) {
+            maskCtx.fillRect(maskX, maskY, maskWidth, maskHeight)
+          } else if (geoShape.props?.geo === 'ellipse') {
+            maskCtx.beginPath()
+            maskCtx.ellipse(
+              maskX + maskWidth/2, 
+              maskY + maskHeight/2, 
+              maskWidth/2, 
+              maskHeight/2, 
+              0, 0, 2 * Math.PI
+            )
+            maskCtx.fill()
+          } else {
+            // Fallback to rectangle for other geo types
+            maskCtx.fillRect(maskX, maskY, maskWidth, maskHeight)
+          }
+        } else {
+          // Fallback for other shape types
+          maskCtx.fillRect(maskX, maskY, maskWidth, maskHeight)
+        }
+      }
+
+      // Convert canvas to data URL
+      const maskImageData = maskCanvas.toDataURL('image/png')
+      console.log('Mask generated successfully')
+      
+      // Debug: Create a visual preview of the mask
+      const debugCanvas = document.createElement('canvas')
+      debugCanvas.width = 200
+      debugCanvas.height = 200
+      const debugCtx = debugCanvas.getContext('2d')
+      if (debugCtx) {
+        debugCtx.drawImage(maskCanvas, 0, 0, 200, 200)
+        const debugDataUrl = debugCanvas.toDataURL('image/png')
+        console.log('Generated mask preview (200x200):', debugDataUrl)
+        
+        // You can uncomment this to see the mask in the browser console
+        // const img = new Image()
+        // img.src = debugDataUrl
+        // console.log('Mask preview image:', img)
+      }
+      
+      return maskImageData
+
+    } catch (error) {
+      console.error('Error extracting mask from shapes:', error)
+      throw error
+    }
+  }
+
   // Generate images
   const generateImages = async () => {
     if (!editorState.originalImage || !editorState.prompt.trim() || !sessionId || !tldrawEditor) {
@@ -257,17 +463,11 @@ export default function TldrawMaskEditor({}: TldrawMaskEditorProps) {
       setIsGenerating(true)
       setError(null)
 
-      // For demo purposes, create a simple white mask
-      // In a full implementation, you'd extract the actual drawn shapes from tldraw
-      const canvas = document.createElement('canvas')
-      canvas.width = 400
-      canvas.height = 300
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(100, 100, 200, 100) // Simple rectangle mask for demo
+      // Extract mask from drawn shapes
+      const maskImageData = await extractMaskFromShapes()
+      if (!maskImageData) {
+        throw new Error('Failed to generate mask from drawn shapes')
       }
-      const maskImageData = canvas.toDataURL('image/png')
       
       const formData = new FormData()
       formData.append('imagePath', editorState.originalImage.path)

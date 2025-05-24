@@ -18,6 +18,7 @@ interface EditorState {
     data: string;
   };
   prompt: string;
+  selectedModel: string;
   resultImages?: Array<{
     url: string;
     path: string;
@@ -30,6 +31,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
   // Main state
   const [editorState, setEditorState] = useState<EditorState>({
     prompt: '',
+    selectedModel: 'recraft',
     selectedImageIndex: 0
   })
   
@@ -233,6 +235,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
     const actualY = displayY * scaleY
     const actualBrushSize = brushSize * Math.min(scaleX, scaleY)
     
+    // Draw white pixels for visual feedback - these will be converted to transparent areas for OpenAI
     ctx.globalAlpha = brushOpacity
     ctx.fillStyle = '#ffffff'
     ctx.beginPath()
@@ -266,6 +269,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
       formData.append('maskData', maskImageData)
       formData.append('prompt', editorState.prompt.trim())
       formData.append('sessionId', sessionId)
+      formData.append('model', editorState.selectedModel)
       
       const response = await fetch('/api/mask-edit-image', {
         method: 'POST',
@@ -305,6 +309,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
   const resetEditor = () => {
     setEditorState({
       prompt: '',
+      selectedModel: 'recraft',
       selectedImageIndex: 0
     })
     setIsImageLoaded(false)
@@ -370,7 +375,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
 
         {/* Mask Drawing Panel */}
         <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-900">Draw Mask</h3>
+          <h3 className="text-lg font-medium text-gray-900">Draw Editing Mask</h3>
           <div className="border-2 border-gray-200 rounded-lg bg-gray-50 aspect-square flex items-center justify-center">
             {editorState.originalImage ? (
               <div 
@@ -411,6 +416,11 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
                 <p>Upload an image to start drawing masks</p>
               </div>
             )}
+          </div>
+          {/* Mask Instructions */}
+          <div className="text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+            <p className="font-medium text-yellow-800">💡 Mask Instructions:</p>
+            <p>Paint <strong>white areas</strong> where you want AI to make changes. The rest of the image will stay unchanged.</p>
           </div>
         </div>
 
@@ -503,6 +513,29 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
           </div>
         )}
 
+        {/* Model Selection */}
+        <div>
+          <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-2">
+            AI Model
+          </label>
+          <select
+            id="model"
+            value={editorState.selectedModel}
+            onChange={(e) => setEditorState(prev => ({ ...prev, selectedModel: e.target.value }))}
+            disabled={isGenerating}
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          >
+            <option value="recraft">Recraft AI (Recommended)</option>
+            <option value="openai">OpenAI DALL-E (Coming Soon)</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            {editorState.selectedModel === 'recraft' 
+              ? 'High-quality realistic image generation with excellent inpainting capabilities'
+              : 'Classic DALL-E model for creative image editing (temporarily unavailable)'
+            }
+          </p>
+        </div>
+
         {/* Prompt Input */}
         <div>
           <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
@@ -513,7 +546,7 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
               id="prompt"
               rows={3}
               className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              placeholder="Describe what you want to change in the masked area..."
+              placeholder="Describe what you want to change in the masked area (e.g., 'add sunglasses', 'change to red color', 'remove the object')..."
               value={editorState.prompt}
               onChange={(e) => setEditorState(prev => ({ ...prev, prompt: e.target.value }))}
               disabled={isGenerating}
@@ -573,15 +606,24 @@ export default function UnifiedMaskEditor({}: UnifiedMaskEditorProps) {
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">How to use:</h3>
+            <h3 className="text-sm font-medium text-blue-800">How to use OpenAI Image Editing:</h3>
             <div className="mt-2 text-sm text-blue-700">
               <ol className="list-decimal pl-5 space-y-1">
                 <li>Upload an image by clicking or dragging to the first panel</li>
-                <li>Draw a white mask on areas you want to edit in the middle panel</li>
-                <li>Enter a prompt describing your desired changes</li>
-                <li>Click Generate to create edited versions</li>
+                <li><strong>Paint white areas</strong> on parts you want to edit in the middle panel</li>
+                <li>Enter a prompt describing your desired changes (be specific!)</li>
+                <li>Click Generate to create 3 edited versions using OpenAI's gpt-image-1 model</li>
                 <li>View results in the third panel and download your favorites</li>
               </ol>
+              <div className="mt-3 p-2 bg-blue-100 rounded">
+                <p className="font-medium">✨ Pro Tips:</p>
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li>Be specific in your prompts: "add red sunglasses" vs "add sunglasses"</li>
+                  <li>Only paint areas you want changed - unpainted areas stay original</li>
+                  <li>Try different brush sizes for precise or broad edits</li>
+                  <li>The AI works best with clear, well-lit images</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>

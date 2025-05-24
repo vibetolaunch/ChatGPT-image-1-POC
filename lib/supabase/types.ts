@@ -61,6 +61,8 @@ export type Database = {
           edited_image_url: string
           prompt: string
           mask_data: string | null
+          model_used: string
+          model_version: string
           created_at: string
         }
         Insert: {
@@ -70,6 +72,8 @@ export type Database = {
           edited_image_url: string
           prompt: string
           mask_data?: string | null
+          model_used?: string
+          model_version?: string
           created_at?: string
         }
         Update: {
@@ -79,6 +83,8 @@ export type Database = {
           edited_image_url?: string
           prompt?: string
           mask_data?: string | null
+          model_used?: string
+          model_version?: string
           created_at?: string
         }
       }

@@ -1,27 +1,19 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { useToken } from '@/lib/tokenService';
-import { featureFlags } from '@/lib/config';
-
-// Instantiate OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { featureFlags, imageModels } from '@/lib/config';
+import { ImageProviderFactory } from '@/lib/providers/ImageProviderFactory';
+import { ImageEditParams } from '@/lib/providers/types'; // Import ImageEditParams
 
 export async function POST(request: Request) {
-  if (!openai.apiKey) {
-    console.error('OPENAI_API_KEY is not set.');
-    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
-  }
-
   try {
     const formData = await request.formData();
     const imagePath = formData.get('imagePath') as string | null;
     const maskData = formData.get('maskData') as string | null;
     const prompt = formData.get('prompt') as string | null;
     const sessionId = formData.get('sessionId') as string | null;
+    const modelName = formData.get('model') as string | null; // Optional model selection
 
     // Validate required fields
     if (!imagePath) {
@@ -57,6 +49,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
+    // Get the selected model (defaults to Recraft)
+    const selectedModel = modelName || imageModels.default;
+    const modelConfig = ImageProviderFactory.getModelConfig(selectedModel);
+    
+    console.log(`Using model: ${selectedModel} (${modelConfig.name})`);
+
+    // Get the appropriate provider
+    const provider = ImageProviderFactory.getProvider(selectedModel);
+
     // Fetch the original image from Supabase Storage
     const { data: imageData, error: imageError } = await supabase.storage
       .from('images')
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch the original image' }, { status: 500 });
     }
 
-    // Convert the image to PNG format for OpenAI API
+    // Convert the image to PNG format
     const imageBuffer = await sharp(await imageData.arrayBuffer())
       .toFormat('png')
       .toBuffer();
@@ -87,231 +88,45 @@ export async function POST(request: Request) {
 
     console.log(`Original image dimensions: ${originalWidth}x${originalHeight}`);
 
-    // For OpenAI API, we need to use one of the supported sizes: 256x256, 512x512, or 1024x1024
-    // We'll choose the size that best fits while maintaining aspect ratio
-    const maxDimension = Math.max(originalWidth, originalHeight);
-    let targetSize: 256 | 512 | 1024;
-    let sizeParam: "256x256" | "512x512" | "1024x1024";
+    // Use the provider to edit the image
+    let providerOptions: ImageEditParams['options'] = {
+      negativePrompt: formData.get('negativePrompt') as string || undefined,
+    };
 
-    if (maxDimension <= 256) {
-      targetSize = 256;
-      sizeParam = "256x256";
-    } else if (maxDimension <= 512) {
-      targetSize = 512;
-      sizeParam = "512x512";
-    } else {
-      targetSize = 1024;
-      sizeParam = "1024x1024";
+    if (selectedModel === 'recraft') {
+      providerOptions.style = formData.get('style') as string || 'realistic_image';
+      providerOptions.model = 'recraftv3'; // Recraft specific internal model
+      // Add other Recraft specific options if any are sent via formData
+    } else if (selectedModel === 'stabilityai') {
+      providerOptions.style = formData.get('style') as string || undefined; // Will map to style_preset
+      providerOptions.cfgScale = formData.get('cfgScale') ? parseFloat(formData.get('cfgScale') as string) : undefined;
+      providerOptions.steps = formData.get('steps') ? parseInt(formData.get('steps') as string, 10) : undefined;
+      providerOptions.samples = formData.get('samples') ? parseInt(formData.get('samples') as string, 10) : undefined;
+      providerOptions.seed = formData.get('seed') ? parseInt(formData.get('seed') as string, 10) : undefined;
+      // model option in ImageEditParams can be used for engineId if needed, but provider uses its own config.
     }
+    // For OpenAI, similar logic would apply if implemented
 
-    console.log(`Using OpenAI size: ${sizeParam}`);
-
-    // Create a square canvas with the target size and place the image in the center
-    // This preserves the original aspect ratio and scale relationship
-    const aspectRatio = originalWidth / originalHeight;
-    let scaledWidth: number, scaledHeight: number;
-
-    if (aspectRatio >= 1) {
-      // Landscape or square
-      scaledWidth = targetSize;
-      scaledHeight = Math.round(targetSize / aspectRatio);
-    } else {
-      // Portrait
-      scaledHeight = targetSize;
-      scaledWidth = Math.round(targetSize * aspectRatio);
-    }
-
-    // Calculate positioning to center the image
-    const offsetX = Math.round((targetSize - scaledWidth) / 2);
-    const offsetY = Math.round((targetSize - scaledHeight) / 2);
-
-    console.log(`Scaled dimensions: ${scaledWidth}x${scaledHeight}, offset: ${offsetX},${offsetY}`);
-
-    // Create a square canvas with black background and place the resized image in the center
-    const squareImageBuffer = await sharp({
-      create: {
-        width: targetSize,
-        height: targetSize,
-        channels: 3,
-        background: { r: 0, g: 0, b: 0 }
-      }
-    })
-    .composite([{
-      input: await sharp(imageBuffer)
-        .resize(scaledWidth, scaledHeight, { 
-          fit: 'fill',
-          kernel: sharp.kernel.lanczos3 
-        })
-        .toBuffer(),
-      left: offsetX,
-      top: offsetY
-    }])
-    .png()
-    .toBuffer();
-
-    // Create a corresponding square mask with the same positioning
-    const squareMaskBuffer = await sharp({
-      create: {
-        width: targetSize,
-        height: targetSize,
-        channels: 3,
-        background: { r: 0, g: 0, b: 0 }
-      }
-    })
-    .composite([{
-      input: await sharp(maskBuffer)
-        .resize(scaledWidth, scaledHeight, { 
-          fit: 'fill',
-          kernel: sharp.kernel.nearest 
-        })
-        .toBuffer(),
-      left: offsetX,
-      top: offsetY
-    }])
-    .png()
-    .toBuffer();
-
-    // Create File objects for OpenAI API
-    const imageFile = new File([squareImageBuffer], 'image.png', { type: 'image/png' });
-    const maskFile = new File([squareMaskBuffer], 'mask.png', { type: 'image/png' });
-
-    console.log('Calling OpenAI API with masked image edit...');
-    
-    // Call OpenAI API to edit the image with the mask - generate 3 options
-    const result = await openai.images.edit({
-      model: "gpt-image-1",
-      image: imageFile,
-      mask: maskFile,
+    const results = await provider.editImage({
+      image: imageBuffer,
+      mask: maskBuffer,
       prompt: prompt,
-      n: 3, // Generate 3 options
-      size: sizeParam,
-      quality: "low" // Use low quality for faster generation
+      originalWidth: originalWidth,
+      originalHeight: originalHeight,
+      options: providerOptions,
     });
 
-    // Check if result is defined before accessing data
-    if (!result || !result.data || result.data.length === 0) {
-      console.error('OpenAI response object is undefined or empty.');
-      throw new Error('Failed to get response from OpenAI');
+    if (results.length === 0) {
+      throw new Error(`No images returned from ${modelConfig.name}`);
     }
 
-    console.log(`Processing ${result.data.length} images from OpenAI...`);
+    console.log(`Successfully processed ${results.length} images using ${modelConfig.name}`);
 
-    // Process all images from the response
-    const processedImages = [];
-    
-    // Create original-sized mask for compositing
-    const originalSizedMaskBuffer = await sharp(maskBuffer)
-      .resize(originalWidth, originalHeight, { 
-        fit: 'fill',
-        kernel: sharp.kernel.nearest 
-      })
-      .toFormat('png')
-      .toBuffer();
-
-    // Convert original-sized mask to grayscale for compositing
-    const maskAsAlpha = await sharp(originalSizedMaskBuffer)
-      .greyscale()
-      .toBuffer();
-
-    for (let i = 0; i < result.data.length; i++) {
-      const imageData = result.data[i];
-      const imageUrl = imageData?.url;
-      const imageB64Json = imageData?.b64_json;
-
-      let openaiResultBuffer: Buffer;
-
-      if (imageB64Json) {
-        // Handle base64 response
-        console.log(`Processing base64 image ${i + 1} response from OpenAI`);
-        openaiResultBuffer = Buffer.from(imageB64Json, 'base64');
-      } else if (imageUrl) {
-        // Handle URL response
-        console.log(`Processing URL image ${i + 1} response from OpenAI`);
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch edited image ${i + 1} from OpenAI`);
-        }
-        
-        const resultBuffer = await imageResponse.arrayBuffer();
-        openaiResultBuffer = Buffer.from(resultBuffer);
-      } else {
-        console.error(`No image URL or base64 data found in OpenAI response for image ${i + 1}:`, imageData);
-        continue; // Skip this image and continue with others
-      }
-
-      console.log(`Compositing OpenAI result ${i + 1} with original image...`);
-      
-      // Extract the relevant portion from the square OpenAI result
-      const croppedOpenaiResult = await sharp(openaiResultBuffer)
-        .extract({
-          left: offsetX,
-          top: offsetY,
-          width: scaledWidth,
-          height: scaledHeight
-        })
-        .resize(originalWidth, originalHeight, { 
-          fit: 'fill',
-          kernel: sharp.kernel.lanczos3 
-        })
-        .toFormat('png')
-        .toBuffer();
-
-      // Step 2: Create RGBA version of OpenAI result with mask as alpha channel
-      const openaiWithAlpha = await sharp(croppedOpenaiResult)
-        .ensureAlpha()
-        .composite([{
-          input: maskAsAlpha,
-          blend: 'dest-in'
-        }])
-        .toBuffer();
-
-      // Step 3: Composite the masked OpenAI result over the original image
-      const resultBufferNode = await sharp(imageBuffer)
-        .composite([{
-          input: openaiWithAlpha,
-          blend: 'over'
-        }])
-        .toFormat('png')
-        .toBuffer();
-
-      // Save the result image to Supabase Storage
-      const resultFileName = `${user.id}-result-${Date.now()}-option${i + 1}.png`;
-      const { error: resultUploadError } = await supabase.storage
-        .from('edited-images')
-        .upload(resultFileName, resultBufferNode);
-
-      if (resultUploadError) {
-        console.error(`Error uploading result image ${i + 1}:`, resultUploadError);
-        continue; // Skip this image and continue with others
-      }
-
-      // Get the public URL for the result image
-      const { data: { publicUrl: resultPublicUrl } } = supabase.storage
-        .from('edited-images')
-        .getPublicUrl(resultFileName);
-
-      // Convert buffer to base64
-      const imageB64 = resultBufferNode.toString('base64');
-
-      processedImages.push({
-        editedImageB64: imageB64,
-        editedImageUrl: resultPublicUrl,
-        editedImagePath: resultFileName,
-        optionNumber: i + 1
-      });
-
-      console.log(`Image ${i + 1} compositing completed successfully`);
-    }
-
-    if (processedImages.length === 0) {
-      throw new Error('Failed to process any images from OpenAI response');
-    }
-
-    // Save the mask image to Supabase Storage (save the original-sized mask)
+    // Save the mask image to Supabase Storage for record keeping
     const maskFileName = `${user.id}-mask-${Date.now()}.png`;
     const { error: maskUploadError } = await supabase.storage
       .from('masks')
-      .upload(maskFileName, originalSizedMaskBuffer);
+      .upload(maskFileName, maskBuffer);
 
     if (maskUploadError) {
       console.error('Error uploading mask:', maskUploadError);
@@ -331,12 +146,16 @@ export async function POST(request: Request) {
     }
 
     // Save edit records to the database for each processed image
-    const editRecords = processedImages.map(img => ({
+    const editRecords = results.map(img => ({
       user_id: user.id,
       original_image_id: originalImageData?.id || null,
       mask_storage_path: maskFileName,
       result_storage_path: img.editedImagePath,
-      prompt: prompt
+      prompt: prompt,
+      model_used: selectedModel,
+      model_version: selectedModel === 'stabilityai' 
+        ? (modelConfig as typeof imageModels.models.stabilityai).engineId 
+        : (selectedModel === 'recraft' ? 'v3' : 'gpt-image-1') // Fallback for others
     }));
 
     const { error: dbError } = await supabase
@@ -350,26 +169,29 @@ export async function POST(request: Request) {
 
     // Return all processed images
     return NextResponse.json({
-      images: processedImages,
+      images: results,
       maskPath: maskFileName,
-      totalOptions: processedImages.length
+      totalOptions: results.length,
+      model: modelConfig.name,
+      provider: modelConfig.provider
     });
 
   } catch (error: any) {
     console.error('Error processing masked image:', error);
     
-    if (error instanceof OpenAI.APIError) {
-      console.error('OpenAI API Error Details:', {
-        status: error.status,
-        code: error.code,
-        type: error.type,
-        message: error.message,
-        headers: error.headers
-      });
+    // Enhanced error handling for different providers
+    let errorMessage = error.message || 'Failed to process image';
+    let errorStatus = 500;
+
+    if (error.message?.includes('API key is not configured')) {
+      errorMessage = 'Service configuration error. Please contact support.';
+      errorStatus = 503;
+    } else if (error.message?.includes('API error')) {
+      errorMessage = 'External service error. Please try again.';
+      errorStatus = 502;
+    } else if (error.message?.includes('file size') || error.message?.includes('resolution') || error.message?.includes('dimensions')) {
+      errorStatus = 400;
     }
-    
-    const errorMessage = error.message || 'Failed to process image';
-    const errorStatus = error instanceof OpenAI.APIError ? (error.status || 500) : 500;
 
     return NextResponse.json(
       { error: errorMessage },

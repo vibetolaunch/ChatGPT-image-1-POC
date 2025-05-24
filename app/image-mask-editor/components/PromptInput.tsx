@@ -3,17 +3,18 @@
 import { useState } from 'react'
 
 interface PromptInputProps {
-  onPromptSubmitted: (prompt: string) => void
+  onPromptSubmitted: (prompt: string, model?: string) => void
   isLoading: boolean
 }
 
 export default function PromptInput({ onPromptSubmitted, isLoading }: PromptInputProps) {
   const [prompt, setPrompt] = useState('')
+  const [selectedModel, setSelectedModel] = useState('recraft')
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (prompt.trim() && !isLoading) {
-      onPromptSubmitted(prompt.trim())
+      onPromptSubmitted(prompt.trim(), selectedModel)
     }
   }
   
@@ -27,7 +28,30 @@ export default function PromptInput({ onPromptSubmitted, isLoading }: PromptInpu
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="prompt" className="sr-only">
+            <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-2">
+              AI Model
+            </label>
+            <select
+              id="model"
+              name="model"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              disabled={isLoading}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="recraft">Recraft AI (Recommended)</option>
+              <option value="openai">OpenAI DALL-E (Coming Soon)</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {selectedModel === 'recraft' 
+                ? 'High-quality realistic image generation with excellent inpainting capabilities'
+                : 'Classic DALL-E model for creative image editing (temporarily unavailable)'
+              }
+            </p>
+          </div>
+          
+          <div>
+            <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
               Prompt
             </label>
             <textarea

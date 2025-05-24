@@ -36,6 +36,20 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // If user is logged in and on the homepage, redirect to /image-mask-editor
+  if (user && request.nextUrl.pathname === '/') {
+    const homeRedirectUrl = request.nextUrl.clone()
+    homeRedirectUrl.pathname = '/image-mask-editor'
+    return NextResponse.redirect(homeRedirectUrl)
+  }
+
+  // If user is logged in and tries to access /dashboard, redirect to /image-mask-editor
+  if (user && request.nextUrl.pathname === '/dashboard') {
+    const dashboardRedirectUrl = request.nextUrl.clone()
+    dashboardRedirectUrl.pathname = '/image-mask-editor'
+    return NextResponse.redirect(dashboardRedirectUrl)
+  }
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
