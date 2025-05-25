@@ -58,7 +58,7 @@ export default function UnifiedPaintingCanvas() {
   // UI state
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showMask, setShowMask] = useState(false)
+  const [showMask, setShowMask] = useState(true)
   const [showAIModal, setShowAIModal] = useState(false)
   const [isAIGenerating, setIsAIGenerating] = useState(false)
   const [aiResult, setAiResult] = useState<string | undefined>()

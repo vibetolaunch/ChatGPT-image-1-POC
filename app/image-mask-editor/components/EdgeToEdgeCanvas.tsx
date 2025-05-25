@@ -23,6 +23,8 @@ interface EdgeToEdgeCanvasProps {
   onCanvasStateChange: (state: CanvasState) => void;
   isDragActive: boolean;
   isUploading: boolean;
+  showMask?: boolean;
+  activeTool?: string;
 }
 
 export interface EdgeToEdgeCanvasRef {
@@ -38,7 +40,9 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
   backgroundImage,
   onCanvasStateChange,
   isDragActive,
-  isUploading
+  isUploading,
+  showMask = false,
+  activeTool = 'brush'
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -194,7 +198,11 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
       <canvas
         ref={paintingCanvasRef}
         className="absolute cursor-crosshair"
-        style={{ zIndex: 20 }}
+        style={{ 
+          zIndex: 20,
+          opacity: (activeTool === 'mask' && !showMask) ? 0 : 1,
+          transition: 'opacity 0.2s ease-in-out'
+        }}
       />
 
       {/* Instructions when no image */}

@@ -107,6 +107,16 @@ export async function POST(request: Request) {
     }
     // For OpenAI, similar logic would apply if implemented
 
+    console.log('Calling provider.editImage with:', {
+      imageBufferSize: imageBuffer.length,
+      maskBufferSize: maskBuffer.length,
+      prompt: prompt,
+      originalWidth: originalWidth,
+      originalHeight: originalHeight,
+      options: providerOptions,
+      provider: selectedModel
+    });
+
     const results = await provider.editImage({
       image: imageBuffer,
       mask: maskBuffer,

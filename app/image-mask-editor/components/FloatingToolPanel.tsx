@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 
 interface ToolState {
-  activeTool: 'brush' | 'eraser' | 'upload'
+  activeTool: 'brush' | 'eraser' | 'upload' | 'mask'
   brushSize: number
   brushOpacity: number
   brushColor: string
@@ -18,6 +18,9 @@ interface FloatingToolPanelProps {
   onClear: () => void
   canUndo: boolean
   canRedo: boolean
+  showMask?: boolean
+  onToggleMask?: () => void
+  onAIGenerate?: () => void
 }
 
 interface Position {
@@ -33,7 +36,10 @@ export default function FloatingToolPanel({
   onRedo,
   onClear,
   canUndo,
-  canRedo
+  canRedo,
+  showMask = false,
+  onToggleMask,
+  onAIGenerate
 }: FloatingToolPanelProps) {
   const [position, setPosition] = useState<Position>({ x: 20, y: 20 })
   const [isDragging, setIsDragging] = useState(false)
@@ -43,6 +49,16 @@ export default function FloatingToolPanel({
   
   const panelRef = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<HTMLDivElement>(null)
+  const animationFrameRef = useRef<number>()
+  const panelDimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+
+  // Cache panel dimensions to avoid repeated DOM queries
+  const updatePanelDimensions = useCallback(() => {
+    if (panelRef.current) {
+      const rect = panelRef.current.getBoundingClientRect()
+      panelDimensionsRef.current = { width: rect.width, height: rect.height }
+    }
+  }, [])
 
   // Handle drag start
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -54,92 +70,164 @@ export default function FloatingToolPanel({
       y: e.clientY - rect.top
     })
     setIsDragging(true)
+    updatePanelDimensions()
     e.preventDefault()
-  }, [])
+  }, [updatePanelDimensions])
 
-  // Handle drag move
+  // Optimized drag move with requestAnimationFrame
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return
     
-    const newX = e.clientX - dragOffset.x
-    const newY = e.clientY - dragOffset.y
+    // Cancel previous animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
     
-    // Keep panel within viewport bounds
-    const maxX = window.innerWidth - (panelRef.current?.offsetWidth || 0)
-    const maxY = window.innerHeight - (panelRef.current?.offsetHeight || 0)
-    
-    setPosition({
-      x: Math.max(0, Math.min(newX, maxX)),
-      y: Math.max(0, Math.min(newY, maxY))
+    // Use requestAnimationFrame for smooth updates
+    animationFrameRef.current = requestAnimationFrame(() => {
+      const newX = e.clientX - dragOffset.x
+      const newY = e.clientY - dragOffset.y
+      
+      // Use cached dimensions instead of DOM queries
+      const { width, height } = panelDimensionsRef.current
+      const maxX = window.innerWidth - width
+      const maxY = window.innerHeight - height
+      
+      setPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      })
     })
   }, [isDragging, dragOffset])
 
-  // Handle drag end
+  // Handle drag end with auto-docking
   const handleMouseUp = useCallback(() => {
     setIsDragging(false)
+    
+    // Cancel any pending animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+    
+    // Auto-dock logic - only run once at end of drag
+    const { width, height } = panelDimensionsRef.current
+    const snapDistance = 20
+    
+    setPosition(currentPosition => {
+      let newPosition = { ...currentPosition }
+      
+      // Snap to left edge
+      if (currentPosition.x < snapDistance) {
+        newPosition.x = 0
+      }
+      // Snap to right edge
+      else if (currentPosition.x > window.innerWidth - width - snapDistance) {
+        newPosition.x = window.innerWidth - width
+      }
+      
+      // Snap to top edge
+      if (currentPosition.y < snapDistance) {
+        newPosition.y = 0
+      }
+      // Snap to bottom edge
+      else if (currentPosition.y > window.innerHeight - height - snapDistance) {
+        newPosition.y = window.innerHeight - height
+      }
+      
+      return newPosition
+    })
   }, [])
 
   // Add global mouse event listeners
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mousemove', handleMouseMove, { passive: true })
       document.addEventListener('mouseup', handleMouseUp)
       
       return () => {
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current)
+        }
       }
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
-  // Auto-dock to edges when close
-  useEffect(() => {
-    if (!isDragging && panelRef.current) {
-      const rect = panelRef.current.getBoundingClientRect()
-      const snapDistance = 20
-      
-      let newPosition = { ...position }
-      
-      // Snap to left edge
-      if (position.x < snapDistance) {
-        newPosition.x = 0
-      }
-      // Snap to right edge
-      else if (position.x > window.innerWidth - rect.width - snapDistance) {
-        newPosition.x = window.innerWidth - rect.width
-      }
-      
-      // Snap to top edge
-      if (position.y < snapDistance) {
-        newPosition.y = 0
-      }
-      // Snap to bottom edge
-      else if (position.y > window.innerHeight - rect.height - snapDistance) {
-        newPosition.y = window.innerHeight - rect.height
-      }
-      
-      if (newPosition.x !== position.x || newPosition.y !== position.y) {
-        setPosition(newPosition)
-      }
+  // Auto-reposition when expanding to ensure panel stays on screen
+  const repositionIfOffScreen = useCallback(() => {
+    if (!panelRef.current) return
+    
+    const rect = panelRef.current.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    
+    let newPosition = { ...position }
+    let needsReposition = false
+    
+    // Check if panel extends beyond right edge
+    if (rect.right > viewportWidth) {
+      newPosition.x = Math.max(0, viewportWidth - rect.width)
+      needsReposition = true
     }
-  }, [isDragging, position])
+    
+    // Check if panel extends beyond bottom edge
+    if (rect.bottom > viewportHeight) {
+      newPosition.y = Math.max(0, viewportHeight - rect.height)
+      needsReposition = true
+    }
+    
+    // Check if panel extends beyond left edge (shouldn't happen but just in case)
+    if (rect.left < 0) {
+      newPosition.x = 0
+      needsReposition = true
+    }
+    
+    // Check if panel extends beyond top edge (shouldn't happen but just in case)
+    if (rect.top < 0) {
+      newPosition.y = 0
+      needsReposition = true
+    }
+    
+    if (needsReposition) {
+      setPosition(newPosition)
+    }
+  }, [position])
+
+  // Update dimensions when collapsed state changes
+  useEffect(() => {
+    if (!isDragging) {
+      // Small delay to allow DOM to update after collapse/expand
+      const timeoutId = setTimeout(() => {
+        updatePanelDimensions()
+        // When expanding, check if we need to reposition to stay on screen
+        if (!isCollapsed) {
+          // Additional small delay to ensure DOM has fully updated with expanded content
+          setTimeout(repositionIfOffScreen, 50)
+        }
+      }, 100)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isCollapsed, updatePanelDimensions, isDragging, repositionIfOffScreen])
 
   const tools = [
     { tool: 'brush' as const, icon: '🖌️', label: 'Brush' },
     { tool: 'eraser' as const, icon: '🧽', label: 'Eraser' },
-    { tool: 'upload' as const, icon: '📁', label: 'Upload' }
+    { tool: 'upload' as const, icon: '📁', label: 'Upload' },
+    { tool: 'mask' as const, icon: '🎭', label: 'Mask' }
   ]
 
   return (
     <div
       ref={panelRef}
-      className={`fixed z-50 select-none transition-all duration-200 ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      className={`fixed z-50 select-none ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-200'
       }`}
       style={{
         left: position.x,
         top: position.y,
-        transform: isDragging ? 'scale(1.02)' : 'scale(1)'
+        transform: isDragging ? 'scale(1.02)' : 'scale(1)',
+        transition: isDragging ? 'none' : 'all 0.2s ease-out'
       }}
     >
       {/* Main Panel */}
@@ -273,6 +361,34 @@ export default function FloatingToolPanel({
                 Clear
               </button>
             </div>
+
+            {/* Mask-specific buttons */}
+            {toolState.activeTool === 'mask' && (
+              <div className="space-y-2 border-t border-gray-200/50 pt-2">
+                <div className="flex gap-1">
+                  {onToggleMask && (
+                    <button
+                      onClick={onToggleMask}
+                      className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
+                        showMask
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50'
+                      }`}
+                    >
+                      {showMask ? 'Hide Mask' : 'Show Mask'}
+                    </button>
+                  )}
+                  {onAIGenerate && (
+                    <button
+                      onClick={onAIGenerate}
+                      className="flex-1 px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                    >
+                      AI Generate
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

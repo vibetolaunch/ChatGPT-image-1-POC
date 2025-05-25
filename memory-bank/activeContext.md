@@ -1,7 +1,7 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content.
 
 ## Recent Focus Areas
 
@@ -68,7 +68,52 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Enhanced error handling
 - **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 
-### 5. **Previous Fixes Maintained**
+### 5. **Drag Performance Optimization (COMPLETED - 2025-05-25)**
+- **Issue**: Floating toolbar dragging was laggy and not performant
+- **Root Causes**:
+  - Excessive re-renders during drag operations
+  - Heavy DOM calculations (`getBoundingClientRect()`) on every mousemove
+  - Inefficient auto-docking logic running continuously
+  - CSS transitions interfering with smooth dragging
+- **Solution**: 
+  - **requestAnimationFrame**: Used RAF for smooth position updates instead of direct state changes
+  - **Dimension Caching**: Cache panel dimensions to avoid repeated DOM queries during drag
+  - **Passive Event Listeners**: Added `{ passive: true }` to mousemove events for better performance
+  - **Optimized Auto-docking**: Moved auto-dock logic to drag end instead of continuous checking
+  - **Conditional Transitions**: Disable CSS transitions during drag, re-enable when not dragging
+- **Implementation Details**:
+  - Added `animationFrameRef` to manage RAF calls and prevent stacking
+  - Created `panelDimensionsRef` to cache width/height and avoid DOM queries
+  - Modified CSS classes to conditionally apply transitions based on drag state
+  - Used functional state updates to prevent stale closure issues
+  - Added proper cleanup for animation frames in useEffect
+- **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
+- **Performance Impact**: Eliminated lag during dragging, smooth 60fps movement
+
+### 6. **Auto-Repositioning Feature (COMPLETED - 2025-05-25)**
+- **Issue**: When expanding the floating toolbar, parts could extend off-screen making content inaccessible
+- **User Experience Problem**: Users would lose access to toolbar controls if panel expanded beyond viewport bounds
+- **Solution**: 
+  - **Intelligent Repositioning**: Automatically detect when expanded content would go off-screen
+  - **Viewport Boundary Detection**: Check all four edges (right, bottom, left, top) for overflow
+  - **Smart Positioning**: Move panel to nearest valid position where it's fully visible
+  - **Seamless UX**: Repositioning happens automatically without user intervention
+- **Implementation Details**:
+  - Added `repositionIfOffScreen` function that calculates optimal panel position
+  - Integrated with existing collapse/expand logic using useEffect
+  - Uses `getBoundingClientRect()` to get actual panel dimensions after DOM update
+  - Calculates new position based on viewport dimensions and panel size
+  - Only repositions when necessary to minimize unnecessary movement
+  - Preserves user's preferred position when possible
+- **Technical Approach**:
+  - Triggered when `isCollapsed` changes from true to false (expansion)
+  - Uses setTimeout with delays to ensure DOM has updated with new content
+  - Checks each viewport edge and adjusts position accordingly
+  - Maintains existing auto-docking and drag functionality
+- **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
+- **UX Impact**: Users can now expand toolbar anywhere on screen without losing access to controls
+
+### 7. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
