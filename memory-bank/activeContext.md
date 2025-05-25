@@ -1,71 +1,83 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. The main interface is the `UnifiedPaintingCanvas` component which provides a complete image editing workflow. **Recent Fix**: Resolved file upload dialog bug where clicking other tools would unexpectedly trigger file upload.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience.
 
 ## Recent Focus Areas
 
-### 1. **File Upload Dialog Fix (COMPLETED)**
-- **Issue**: After uploading an image, clicking other buttons (brush, eraser) would reopen the file upload dialog
-- **Root Cause**: Dropzone's `getRootProps()` applied to entire component container, making all clicks trigger file upload
-- **Solution**: 
-  - Removed `getRootProps()` from main container
-  - Added dedicated hidden file input with proper event handling
-  - Modified upload button to trigger file selection only when clicked
-  - Preserved drag-and-drop functionality only when upload tool is active
-- **Impact**: File upload dialog now only appears when explicitly intended (clicking Upload button or dragging files)
-- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
-
-### 2. **Canvas Layering Fix (COMPLETED)**
-- **Issue**: Uploaded images were hidden behind white painting canvas background
-- **Root Cause**: Painting canvas initialized with white fill instead of transparent
-- **Solution**: Changed canvas initialization from `fillRect()` to `clearRect()` for transparency
-- **Impact**: Images now display immediately upon upload, proper mask painting workflow
-- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
-
-### 2. **Unified Canvas Implementation**
-- **Component**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
-- **Purpose**: Single interface combining image upload, mask editing, and result display
-- **Status**: Primary interface for the application, layering issue resolved
+### 1. **Floating Toolbar Redesign (COMPLETED)**
+- **Implementation**: Created `FloatingToolPanel.tsx` component with modern glassmorphism design
 - **Key Features**:
-  - Image upload with drag-and-drop
-  - Canvas-based mask painting with proper transparency
-  - Provider selection (Stability AI, Recraft AI)
-  - Real-time result display
+  - Draggable positioning anywhere on screen
+  - Auto-docking to screen edges when dragged near them
+  - Collapsible interface with macOS-style window controls
+  - Integrated tool selection (brush, eraser, upload)
+  - Real-time controls for brush size, opacity, and color
+  - Undo/redo functionality with visual state indicators
+- **UX Improvements**: 
+  - Tools float over canvas instead of taking fixed header space
+  - User can position toolbar based on their workflow preferences
+  - Compact design maximizes canvas real estate
+- **Files Created**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 
-### 3. **Provider Integration**
-- **Current Providers**: Stability AI (default), Recraft AI
-- **Missing**: OpenAI ChatGPT-image-1 implementation
-- **Factory Pattern**: `lib/providers/ImageProviderFactory.ts`
-- **Status**: Working for implemented providers
+### 2. **Edge-to-Edge Canvas Layout (COMPLETED)**
+- **Implementation**: Created `EdgeToEdgeCanvas.tsx` for full-viewport canvas experience
+- **Key Features**:
+  - Canvas extends from edge to edge of screen (no borders/frames)
+  - Dark background theme for better image contrast
+  - Responsive scaling maintains aspect ratio
+  - Gradient border glow effect when image is loaded
+  - Full-screen drag-and-drop overlay
+  - Centered canvas with proper viewport calculations
+- **Visual Impact**:
+  - Removed gray container backgrounds
+  - Eliminated fixed layout constraints
+  - Professional dark theme aesthetic
+  - Maximum canvas space utilization
+- **Files Created**: `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
 
-### 4. **Authentication & Database**
-- **Supabase Integration**: Fully functional with SSR
-- **Auth Flow**: Login → Image Editor workflow
-- **Database**: User management, image storage, edit tracking
-- **Middleware**: Proper token refresh and route protection
+### 3. **Unified Canvas Refactor (COMPLETED)**
+- **Major Refactor**: Completely rewrote `UnifiedPaintingCanvas.tsx` to integrate new components
+- **Architecture Changes**:
+  - Replaced fixed toolbar with floating panel system
+  - Integrated edge-to-edge canvas layout
+  - Maintained all existing functionality (drawing, upload, history)
+  - Improved event handling for pointer-based drawing
+  - Preserved drag-and-drop file upload capabilities
+- **Code Quality**: 
+  - Cleaner component separation
+  - Better TypeScript interfaces
+  - Improved state management
+  - Enhanced error handling
+- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+
+### 4. **Previous Fixes Maintained**
+- **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
+- **Canvas Layering**: Maintained transparent painting layer over background images
+- **Provider Integration**: All existing AI provider functionality intact
 
 ## Active Decisions & Preferences
 
-### UI/UX Patterns
-- **Single Page Interface**: Unified canvas approach over multi-step wizard
-- **Real-time Feedback**: Immediate visual feedback during mask creation
-- **Provider Transparency**: User can switch between AI providers easily
-- **Minimal UI**: Focus on core editing functionality
-- **Transparent Layering**: Background images visible through transparent painting layer
+### UI/UX Patterns (Updated)
+- **Floating Interface**: Movable toolbar over fixed header approach
+- **Edge-to-Edge Design**: Maximum canvas space utilization
+- **Dark Theme**: Professional editing environment with better contrast
+- **Glassmorphism**: Modern semi-transparent floating panels
+- **Responsive Positioning**: Auto-docking and viewport-aware positioning
+- **Minimal Distractions**: Tools available but not intrusive
 
-### Technical Patterns
-- **Provider Pattern**: Consistent interface across AI services
-- **Canvas-First**: HTML5 Canvas for mask editing over external libraries
-- **Layered Canvas**: Background canvas (z-index: 1) + transparent painting canvas (z-index: 2)
-- **Server-Side Processing**: Image optimization and API calls on server
-- **Type Safety**: Full TypeScript coverage
+### Technical Patterns (Enhanced)
+- **Component Separation**: Dedicated components for toolbar and canvas
+- **Ref-based Communication**: Canvas access through imperative handles
+- **Event Delegation**: Proper pointer event handling for drawing
+- **Responsive Design**: Viewport-aware scaling and positioning
+- **State Management**: Centralized tool state with callback patterns
 
 ### Configuration Choices
-- **Default Provider**: Stability AI (most reliable for POC)
-- **Token Purchase**: Currently disabled via feature flag
-- **Image Formats**: Support PNG, JPEG, WebP based on provider
-- **File Size Limits**: Provider-specific limits enforced
+- **Canvas Dimensions**: 800x600 base with responsive scaling
+- **History Limit**: 20 undo/redo states for performance
+- **Auto-dock Distance**: 20px snap threshold for edge docking
+- **Default Tool State**: Brush tool, 20px size, 80% opacity, black color
 
 ## Current Challenges
 
@@ -75,67 +87,78 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Impact**: Missing key differentiator of the POC
 - **Next Step**: Complete OpenAI provider implementation
 
-### 2. **Production Readiness**
-- **Issue**: Code is POC-quality, not production-ready
-- **Concerns**: Security, scalability, error handling
-- **Status**: Intentional limitation for demonstration purposes
+### 2. **Mobile Responsiveness**
+- **Issue**: Floating toolbar may need mobile-specific adaptations
+- **Consideration**: Touch-friendly controls and positioning
+- **Status**: Desktop-first implementation complete
 
-### 3. **Token System**
-- **Issue**: In-memory token storage resets on server restart
-- **Impact**: Users lose purchased tokens
-- **Workaround**: Feature flag disables token purchase
-- **Future**: Implement persistent token storage
+### 3. **Performance Optimization**
+- **Issue**: Large image handling could be optimized
+- **Consideration**: Canvas rendering performance with complex masks
+- **Status**: Functional but could be enhanced
 
 ## Next Steps Priority
 
 ### High Priority
-1. **Complete OpenAI Provider**: Implement ChatGPT-image-1 integration
-2. **Test Full Workflow**: End-to-end testing with all providers
-3. **Error Handling**: Improve user feedback for API failures
+1. **Mobile Optimization**: Adapt floating toolbar for touch devices
+2. **Performance Testing**: Validate with large images and complex masks
+3. **User Testing**: Gather feedback on new interface design
 
 ### Medium Priority
-1. **Token Persistence**: Move from in-memory to database storage
-2. **Performance Optimization**: Large image handling improvements
-3. **UI Polish**: Enhanced user experience and visual feedback
+1. **Keyboard Shortcuts**: Add hotkeys for tool switching and actions
+2. **Zoom Controls**: Integrate zoom functionality into floating panel
+3. **Mini-map**: Add navigation aid for large canvases
 
 ### Low Priority
-1. **Additional Providers**: Consider other AI image services
-2. **Advanced Features**: Batch processing, history management
-3. **Documentation**: User guides and API documentation
+1. **Theme Customization**: Allow light/dark theme switching
+2. **Toolbar Presets**: Save/load toolbar positions and configurations
+3. **Advanced Tools**: Additional brush types and effects
 
 ## Important Patterns & Learnings
 
-### Canvas Implementation
-- **Layering Strategy**: Background canvas for images, transparent painting canvas for masks
-- **Initialization**: Use `clearRect()` for transparent canvas, not `fillRect()` with white
-- **Brush System**: Configurable size and opacity for mask painting
-- **Export Strategy**: Base64 data URLs for API transmission
-- **Format Conversion**: Handle RGBA vs grayscale mask requirements
+### Floating UI Implementation
+- **Drag Handling**: Use pointer events with proper offset calculations
+- **Boundary Constraints**: Keep panels within viewport bounds
+- **Auto-docking**: Smooth snapping to edges with visual feedback
+- **Z-index Management**: Proper layering for floating elements
+- **State Persistence**: Maintain panel positions across interactions
 
-### Provider Differences
-- **Stability AI**: 1MP limit, specific engine requirements, style presets
-- **Recraft AI**: Different size options, grayscale masks, realistic style focus
-- **OpenAI**: Alpha channel masks, limited size options (when implemented)
+### Canvas Architecture
+- **Dual Canvas System**: Background for images, transparent overlay for painting
+- **Responsive Scaling**: Maintain aspect ratio while filling viewport
+- **Event Coordination**: Proper event handling between components
+- **Ref Communication**: Use imperative handles for canvas access
+- **Performance**: Efficient drawing with interpolated brush strokes
 
-### Supabase Patterns
-- **SSR Implementation**: Critical to use `getAll`/`setAll` cookie methods
-- **Storage Policies**: Proper RLS for user-specific file access
-- **Migration Strategy**: Incremental database schema updates
-
-### Security Considerations
-- **API Key Protection**: Never expose in client code
-- **File Validation**: Multiple layers of upload validation
-- **Auth Middleware**: Automatic token refresh and route protection
+### Component Design
+- **Separation of Concerns**: Distinct components for UI and canvas logic
+- **Props Interface**: Clean API boundaries between components
+- **State Management**: Centralized state with callback patterns
+- **TypeScript**: Strong typing for component interfaces
+- **Reusability**: Components designed for potential reuse
 
 ## Development Workflow
 1. **Local Development**: `npm run dev` with proper environment variables
-2. **Database Updates**: `npm run db:migrate` for schema changes
-3. **Testing**: Manual testing with different providers and image types
-4. **Deployment**: Not recommended for production use
+2. **Component Testing**: Individual component validation
+3. **Integration Testing**: Full workflow testing with new UI
+4. **Cross-browser Testing**: Ensure compatibility across browsers
 
 ## Key Files to Monitor
-- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (recently fixed)
+- `app/image-mask-editor/components/FloatingToolPanel.tsx`: New floating toolbar (CREATED)
+- `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: New canvas layout (CREATED)
+- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (REFACTORED)
 - `lib/providers/`: Provider implementations and factory
 - `app/api/mask-edit-image/route.ts`: Core API endpoint
 - `lib/config.ts`: Configuration and feature flags
 - `middleware.ts`: Authentication and routing
+
+## UI Redesign Summary
+The image editor now features a modern, professional interface with:
+- **Floating draggable toolbar** that can be positioned anywhere on screen
+- **Edge-to-edge canvas** with no borders or frames for maximum workspace
+- **Dark theme** for better visual contrast and professional appearance
+- **Glassmorphism design** with semi-transparent floating panels
+- **Auto-docking** toolbar that snaps to screen edges
+- **Preserved functionality** with all existing features intact
+
+This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate.

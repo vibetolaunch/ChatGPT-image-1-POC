@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { createClientSupabaseClient } from '@/lib/supabase'
+import FloatingToolPanel from './FloatingToolPanel'
+import EdgeToEdgeCanvas, { EdgeToEdgeCanvasRef } from './EdgeToEdgeCanvas'
 
 // Types
 interface CanvasState {
@@ -55,7 +57,6 @@ export default function UnifiedPaintingCanvas() {
   // UI state
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showColorPicker, setShowColorPicker] = useState(false)
   
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false)
@@ -68,9 +69,7 @@ export default function UnifiedPaintingCanvas() {
   })
 
   // Canvas refs
-  const containerRef = useRef<HTMLDivElement>(null)
-  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
-  const paintingCanvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasRef = useRef<EdgeToEdgeCanvasRef>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Drawing state refs
@@ -78,9 +77,29 @@ export default function UnifiedPaintingCanvas() {
   const historyRef = useRef<ImageData[]>([])
   const historyIndexRef = useRef(-1)
 
+  // Initialize history when canvas is ready
+  useEffect(() => {
+    const initializeHistory = () => {
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (!paintingCanvas) return
+
+      const ctx = paintingCanvas.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        historyRef.current = [imageData]
+        historyIndexRef.current = 0
+      }
+    }
+
+    // Delay initialization to ensure canvas is ready
+    const timer = setTimeout(initializeHistory, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Save canvas state to history
   const saveToHistory = useCallback(() => {
-    const paintingCanvas = paintingCanvasRef.current
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
     if (!paintingCanvas) return
 
     const ctx = paintingCanvas.getContext('2d')
@@ -102,107 +121,11 @@ export default function UnifiedPaintingCanvas() {
     }
   }, [])
 
-  // Setup canvas
-  useEffect(() => {
-    const setupCanvas = () => {
-      const container = containerRef.current
-      const backgroundCanvas = backgroundCanvasRef.current
-      const paintingCanvas = paintingCanvasRef.current
-
-      if (!container || !backgroundCanvas || !paintingCanvas) {
-        setTimeout(setupCanvas, 100)
-        return
-      }
-
-      // Calculate responsive dimensions
-      const containerRect = container.getBoundingClientRect()
-      const maxWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH)
-      const maxHeight = Math.min(containerRect.height - 40, CANVAS_HEIGHT)
-      
-      const scale = Math.min(maxWidth / CANVAS_WIDTH, maxHeight / CANVAS_HEIGHT, 1)
-      const displayWidth = CANVAS_WIDTH * scale
-      const displayHeight = CANVAS_HEIGHT * scale
-      
-      const offsetX = Math.max((containerRect.width - displayWidth) / 2, 0)
-      const offsetY = Math.max((containerRect.height - displayHeight) / 2, 0)
-
-      // Set canvas dimensions
-      const canvases = [backgroundCanvas, paintingCanvas]
-      canvases.forEach((canvas) => {
-        canvas.width = CANVAS_WIDTH
-        canvas.height = CANVAS_HEIGHT
-        canvas.style.width = `${displayWidth}px`
-        canvas.style.height = `${displayHeight}px`
-        canvas.style.left = `${offsetX}px`
-        canvas.style.top = `${offsetY}px`
-        canvas.style.position = 'absolute'
-      })
-
-      setCanvasState({ scale, offsetX, offsetY, displayWidth, displayHeight })
-
-      // Initialize painting canvas as transparent
-      const paintingCtx = paintingCanvas.getContext('2d')
-      if (paintingCtx) {
-        // Clear the canvas to make it transparent
-        paintingCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        // Initialize history with the transparent canvas
-        const imageData = paintingCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        historyRef.current = [imageData]
-        historyIndexRef.current = 0
-      }
-    }
-
-    setupCanvas()
-    window.addEventListener('resize', setupCanvas)
-    return () => window.removeEventListener('resize', setupCanvas)
-  }, [])
-
-  // Load background image when uploaded
-  useEffect(() => {
-    if (!editorState.backgroundImage) return
-
-    const backgroundCanvas = backgroundCanvasRef.current
-    if (!backgroundCanvas) return
-
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const ctx = backgroundCanvas.getContext('2d')
-      if (ctx) {
-        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        
-        // Calculate scaling to fit canvas while maintaining aspect ratio
-        const imgAspect = img.width / img.height
-        const canvasAspect = CANVAS_WIDTH / CANVAS_HEIGHT
-        
-        let drawWidth, drawHeight, drawX, drawY
-        
-        if (imgAspect > canvasAspect) {
-          // Image is wider than canvas
-          drawWidth = CANVAS_WIDTH
-          drawHeight = CANVAS_WIDTH / imgAspect
-          drawX = 0
-          drawY = (CANVAS_HEIGHT - drawHeight) / 2
-        } else {
-          // Image is taller than canvas
-          drawHeight = CANVAS_HEIGHT
-          drawWidth = CANVAS_HEIGHT * imgAspect
-          drawX = (CANVAS_WIDTH - drawWidth) / 2
-          drawY = 0
-        }
-        
-        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
-      }
-    }
-    img.onerror = () => setError('Failed to load background image')
-    img.src = editorState.backgroundImage.url
-  }, [editorState.backgroundImage])
-
   // Undo/Redo functions
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current--
-      const paintingCanvas = paintingCanvasRef.current
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
       if (ctx && historyRef.current[historyIndexRef.current]) {
         ctx.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
@@ -213,7 +136,7 @@ export default function UnifiedPaintingCanvas() {
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current++
-      const paintingCanvas = paintingCanvasRef.current
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
       if (ctx && historyRef.current[historyIndexRef.current]) {
         ctx.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
@@ -223,12 +146,12 @@ export default function UnifiedPaintingCanvas() {
 
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number) => {
-    const canvas = paintingCanvasRef.current
-    if (!canvas) return { x: 0, y: 0 }
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (!paintingCanvas) return { x: 0, y: 0 }
 
-    const rect = canvas.getBoundingClientRect()
-    const x = ((screenX - rect.left) / rect.width) * canvas.width
-    const y = ((screenY - rect.top) / rect.height) * canvas.height
+    const rect = paintingCanvas.getBoundingClientRect()
+    const x = ((screenX - rect.left) / rect.width) * paintingCanvas.width
+    const y = ((screenY - rect.top) / rect.height) * paintingCanvas.height
 
     return { x: Math.round(x), y: Math.round(y) }
   }, [])
@@ -260,14 +183,14 @@ export default function UnifiedPaintingCanvas() {
       const x = x1 + (x2 - x1) * t
       const y = y1 + (y2 - y1) * t
       
-      const canvas = paintingCanvasRef.current
-      if (canvas) {
-        drawOnCanvas(x, y, canvas, toolState.activeTool === 'eraser')
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (paintingCanvas) {
+        drawOnCanvas(x, y, paintingCanvas, toolState.activeTool === 'eraser')
       }
     }
   }, [toolState.activeTool, drawOnCanvas])
 
-  // Event handlers
+  // Event handlers for canvas drawing
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (toolState.activeTool === 'upload') return
 
@@ -276,9 +199,9 @@ export default function UnifiedPaintingCanvas() {
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     lastPointRef.current = { x, y }
 
-    const canvas = paintingCanvasRef.current
-    if (canvas) {
-      drawOnCanvas(x, y, canvas, toolState.activeTool === 'eraser')
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (paintingCanvas) {
+      drawOnCanvas(x, y, paintingCanvas, toolState.activeTool === 'eraser')
     }
   }, [toolState, screenToCanvas, drawOnCanvas])
 
@@ -388,12 +311,10 @@ export default function UnifiedPaintingCanvas() {
 
   // Handle upload button click
   const handleUploadClick = useCallback(() => {
-    if (toolState.activeTool === 'upload') {
-      fileInputRef.current?.click()
-    }
-  }, [toolState.activeTool])
+    fileInputRef.current?.click()
+  }, [])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { isDragActive } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp']
@@ -405,18 +326,45 @@ export default function UnifiedPaintingCanvas() {
   })
 
   // Clear functions
-  const clearCanvas = () => {
-    const paintingCanvas = paintingCanvasRef.current
+  const clearCanvas = useCallback(() => {
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
     const ctx = paintingCanvas?.getContext('2d')
     if (ctx) {
-      // Clear the canvas to make it transparent
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
       saveToHistory()
     }
-  }
+  }, [saveToHistory])
+
+  // Tool state change handler
+  const handleToolStateChange = useCallback((newState: Partial<ToolState>) => {
+    setToolState(prev => ({ ...prev, ...newState }))
+  }, [])
+
+  // Canvas state change handler
+  const handleCanvasStateChange = useCallback((newState: CanvasState) => {
+    setCanvasState(newState)
+  }, [])
+
+  // Add event listeners to the painting canvas for drawing
+  useEffect(() => {
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (!paintingCanvas) return
+
+    paintingCanvas.addEventListener('pointerdown', handlePointerDown as any)
+    paintingCanvas.addEventListener('pointermove', handlePointerMove as any)
+    paintingCanvas.addEventListener('pointerup', handlePointerUp as any)
+    paintingCanvas.addEventListener('pointerleave', handlePointerUp as any)
+
+    return () => {
+      paintingCanvas.removeEventListener('pointerdown', handlePointerDown as any)
+      paintingCanvas.removeEventListener('pointermove', handlePointerMove as any)
+      paintingCanvas.removeEventListener('pointerup', handlePointerUp as any)
+      paintingCanvas.removeEventListener('pointerleave', handlePointerUp as any)
+    }
+  }, [handlePointerDown, handlePointerMove, handlePointerUp])
 
   return (
-    <div className="w-full h-screen flex flex-col">
+    <div>
       {/* Hidden file input for upload functionality */}
       <input
         ref={fileInputRef}
@@ -428,7 +376,7 @@ export default function UnifiedPaintingCanvas() {
       
       {/* Error display */}
       {error && (
-        <div className="p-4 text-red-700 bg-red-100 border-b">
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 p-4 text-red-700 bg-red-100 border border-red-300 rounded-lg shadow-lg max-w-md">
           <p>{error}</p>
           <button 
             onClick={() => setError(null)}
@@ -439,181 +387,26 @@ export default function UnifiedPaintingCanvas() {
         </div>
       )}
 
-      {/* Tool Panel */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        {/* Primary Tools */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-            {[
-              { tool: 'brush' as ToolType, icon: '🖌️', label: 'Brush' },
-              { tool: 'eraser' as ToolType, icon: '🧽', label: 'Eraser' },
-              { tool: 'upload' as ToolType, icon: '📁', label: 'Upload' }
-            ].map(({ tool, icon, label }) => (
-              <button
-                key={tool}
-                onClick={() => {
-                  setToolState(prev => ({ ...prev, activeTool: tool }))
-                  if (tool === 'upload') {
-                    handleUploadClick()
-                  }
-                }}
-                className={`px-3 py-2 text-sm font-medium flex items-center gap-1 ${
-                  toolState.activeTool === tool
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                title={label}
-              >
-                <span className="text-lg">{icon}</span>
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Floating Tool Panel */}
+      <FloatingToolPanel
+        toolState={toolState}
+        onToolStateChange={handleToolStateChange}
+        onUploadClick={handleUploadClick}
+        onUndo={undo}
+        onRedo={redo}
+        onClear={clearCanvas}
+        canUndo={historyIndexRef.current > 0}
+        canRedo={historyIndexRef.current < historyRef.current.length - 1}
+      />
 
-        {/* Tool Properties */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Color Picker */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Color:</label>
-            <div className="relative">
-              <button
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                className="w-8 h-8 rounded border-2 border-gray-300"
-                style={{ backgroundColor: toolState.brushColor }}
-              />
-              {showColorPicker && (
-                <div className="absolute top-10 left-0 z-50 bg-white border border-gray-300 rounded-lg p-3 shadow-lg">
-                  <input
-                    type="color"
-                    value={toolState.brushColor}
-                    onChange={(e) => setToolState(prev => ({ ...prev, brushColor: e.target.value }))}
-                    className="w-full h-8 rounded"
-                  />
-                  <input
-                    type="text"
-                    value={toolState.brushColor}
-                    onChange={(e) => setToolState(prev => ({ ...prev, brushColor: e.target.value }))}
-                    className="w-full mt-2 px-2 py-1 text-sm border border-gray-300 rounded"
-                    placeholder="#000000"
-                  />
-                  <button
-                    onClick={() => setShowColorPicker(false)}
-                    className="mt-2 px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
-                  >
-                    Close
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Brush Size */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Size:</label>
-            <input
-              type="range"
-              min="2"
-              max="100"
-              value={toolState.brushSize}
-              onChange={(e) => setToolState(prev => ({ ...prev, brushSize: parseInt(e.target.value) }))}
-              className="w-20"
-            />
-            <span className="text-sm text-gray-600 w-8">{toolState.brushSize}</span>
-          </div>
-
-          {/* Opacity */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Opacity:</label>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.1"
-              value={toolState.brushOpacity}
-              onChange={(e) => setToolState(prev => ({ ...prev, brushOpacity: parseFloat(e.target.value) }))}
-              className="w-20"
-            />
-            <span className="text-sm text-gray-600 w-8">{Math.round(toolState.brushOpacity * 100)}%</span>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={undo}
-              disabled={historyIndexRef.current <= 0}
-              className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Undo
-            </button>
-            <button
-              onClick={redo}
-              disabled={historyIndexRef.current >= historyRef.current.length - 1}
-              className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Redo
-            </button>
-            <button
-              onClick={clearCanvas}
-              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Canvas Container */}
-      <div className="flex-1 relative bg-gray-100 overflow-hidden" ref={containerRef}>
-        {isDragActive && (
-          <div className="absolute inset-0 bg-blue-500 bg-opacity-20 border-2 border-dashed border-blue-500 flex items-center justify-center z-10">
-            <div className="text-blue-700 text-xl font-medium">
-              Drop image here to upload
-            </div>
-          </div>
-        )}
-
-        {isUploading && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
-            <div className="bg-white rounded-lg p-4">
-              <div className="text-center">Uploading...</div>
-            </div>
-          </div>
-        )}
-
-        {/* Background Canvas */}
-        <canvas
-          ref={backgroundCanvasRef}
-          className="absolute border border-gray-300 bg-white"
-          style={{ zIndex: 1 }}
-        />
-
-        {/* Painting Canvas */}
-        <canvas
-          ref={paintingCanvasRef}
-          className="absolute border border-gray-300 cursor-crosshair"
-          style={{ zIndex: 2 }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-        />
-
-        {/* Instructions */}
-        {!editorState.backgroundImage && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center text-gray-500 max-w-md">
-              <h3 className="text-lg font-medium mb-2">Interactive Painting Canvas</h3>
-              <p className="text-sm mb-4">
-                Start painting with the brush tool, or click Upload to add a background image.
-              </p>
-              <p className="text-xs">
-                Use the tools above to change brush size, color, and opacity.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Edge-to-Edge Canvas */}
+      <EdgeToEdgeCanvas
+        ref={canvasRef}
+        backgroundImage={editorState.backgroundImage}
+        onCanvasStateChange={handleCanvasStateChange}
+        isDragActive={isDragActive}
+        isUploading={isUploading}
+      />
     </div>
   )
 }
