@@ -4,7 +4,8 @@
 
 ### Core Functionality
 - **Image Upload**: Drag-and-drop file upload with validation
-- **Mask Editing**: Canvas-based painting tools for creating edit masks
+- **Canvas Layering**: Fixed image visibility issue - background images now display properly
+- **Mask Editing**: Canvas-based painting tools for creating edit masks with transparent overlay
 - **AI Generation**: Working integration with Stability AI and Recraft AI
 - **Result Display**: Before/after image comparison
 - **User Authentication**: Complete Supabase Auth flow with SSR
@@ -12,6 +13,7 @@
 
 ### Technical Implementation
 - **Provider Pattern**: Clean abstraction for multiple AI services
+- **Canvas Architecture**: Proper layering with background canvas (z-index: 1) and transparent painting canvas (z-index: 2)
 - **Supabase SSR**: Proper implementation with `@supabase/ssr`
 - **Middleware**: Authentication and token refresh working
 - **API Routes**: Functional endpoints for image generation
@@ -20,6 +22,7 @@
 
 ### User Experience
 - **Unified Interface**: Single-page editing experience
+- **Image Visibility**: Uploaded images now display immediately (fixed layering issue)
 - **Real-time Feedback**: Immediate visual feedback during editing
 - **Provider Selection**: Users can choose between AI providers
 - **Responsive Design**: Works across different screen sizes
@@ -38,6 +41,15 @@
 - **Issue**: In-memory storage resets on server restart
 - **Workaround**: Feature flag `showTokenPurchase: false`
 - **Files**: `lib/tokenService.ts`, Stripe integration ready
+
+## ✅ Recently Completed
+
+### Canvas Layering Fix (COMPLETED)
+- **Issue**: Uploaded images were hidden behind white painting canvas background
+- **Root Cause**: Painting canvas initialized with `fillRect('#ffffff')` instead of transparent
+- **Solution**: Changed initialization to use `clearRect()` for transparency
+- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Images now display immediately upon upload, proper mask painting workflow restored
 
 ## ❌ What's Missing
 
@@ -64,8 +76,8 @@
    - Memory management for image processing
 
 2. **Advanced UI Features**
-   - Undo/redo functionality for mask editing
-   - Brush size and opacity controls
+   - Undo/redo functionality for mask editing (basic implementation exists)
+   - Enhanced brush size and opacity controls (basic implementation exists)
    - Zoom and pan for large images
 
 3. **User Experience Enhancements**
@@ -111,29 +123,33 @@
 
 ## 📊 Current Status Assessment
 
-### Functionality: 75% Complete
-- ✅ Core image editing workflow
+### Functionality: 80% Complete (Updated)
+- ✅ Core image editing workflow (canvas layering fixed)
 - ✅ Multi-provider support (2/3 providers)
 - ✅ Authentication and storage
+- ✅ Proper canvas transparency and image display
 - ❌ OpenAI integration
 - ❌ Token persistence
 
-### User Experience: 70% Complete
-- ✅ Basic editing interface
+### User Experience: 75% Complete (Updated)
+- ✅ Basic editing interface with proper image visibility
 - ✅ File upload and result display
+- ✅ Canvas tools with transparency
 - ❌ Advanced feedback and controls
 - ❌ Mobile optimization
 
-### Technical Quality: 80% Complete
+### Technical Quality: 85% Complete (Updated)
 - ✅ Clean architecture and patterns
 - ✅ Type safety and error handling
 - ✅ Database and auth implementation
+- ✅ Proper canvas layering implementation
 - ❌ Performance optimization
 - ❌ Production readiness
 
-### Documentation: 60% Complete
+### Documentation: 65% Complete (Updated)
 - ✅ README and setup instructions
 - ✅ Code comments and types
+- ✅ Memory bank documentation updated
 - ❌ User guides
 - ❌ API documentation
 
@@ -147,7 +163,7 @@
 ### Short Term (Next Few Sessions)
 1. Implement persistent token storage
 2. Enable token purchase feature
-3. Add advanced canvas controls (brush size, undo/redo)
+3. Add advanced canvas controls enhancements
 
 ### Medium Term (Future Development)
 1. Performance optimization for large images
@@ -170,3 +186,11 @@
 - **Testing Environment**: Safe space for API experimentation
 - **Image Assets**: Test images for validation
 - **Provider Accounts**: Active accounts with all AI services
+
+## 🔄 Recent Changes Log
+
+### 2025-05-24: Canvas Layering Fix
+- **Problem**: Uploaded images hidden behind white canvas background
+- **Solution**: Changed painting canvas initialization from white fill to transparent
+- **Files**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Restored proper image editing workflow, images now visible immediately

@@ -1,27 +1,34 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. The main interface is the `UnifiedPaintingCanvas` component which provides a complete image editing workflow.
+The project is a functional AI image editing POC with mask-based editing capabilities. The main interface is the `UnifiedPaintingCanvas` component which provides a complete image editing workflow. **Recent Fix**: Resolved canvas layering issue where uploaded images were hidden behind white background.
 
 ## Recent Focus Areas
 
-### 1. **Unified Canvas Implementation**
+### 1. **Canvas Layering Fix (COMPLETED)**
+- **Issue**: Uploaded images were hidden behind white painting canvas background
+- **Root Cause**: Painting canvas initialized with white fill instead of transparent
+- **Solution**: Changed canvas initialization from `fillRect()` to `clearRect()` for transparency
+- **Impact**: Images now display immediately upon upload, proper mask painting workflow
+- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+
+### 2. **Unified Canvas Implementation**
 - **Component**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 - **Purpose**: Single interface combining image upload, mask editing, and result display
-- **Status**: Primary interface for the application
+- **Status**: Primary interface for the application, layering issue resolved
 - **Key Features**:
   - Image upload with drag-and-drop
-  - Canvas-based mask painting
+  - Canvas-based mask painting with proper transparency
   - Provider selection (Stability AI, Recraft AI)
   - Real-time result display
 
-### 2. **Provider Integration**
+### 3. **Provider Integration**
 - **Current Providers**: Stability AI (default), Recraft AI
 - **Missing**: OpenAI ChatGPT-image-1 implementation
 - **Factory Pattern**: `lib/providers/ImageProviderFactory.ts`
 - **Status**: Working for implemented providers
 
-### 3. **Authentication & Database**
+### 4. **Authentication & Database**
 - **Supabase Integration**: Fully functional with SSR
 - **Auth Flow**: Login → Image Editor workflow
 - **Database**: User management, image storage, edit tracking
@@ -34,10 +41,12 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Real-time Feedback**: Immediate visual feedback during mask creation
 - **Provider Transparency**: User can switch between AI providers easily
 - **Minimal UI**: Focus on core editing functionality
+- **Transparent Layering**: Background images visible through transparent painting layer
 
 ### Technical Patterns
 - **Provider Pattern**: Consistent interface across AI services
 - **Canvas-First**: HTML5 Canvas for mask editing over external libraries
+- **Layered Canvas**: Background canvas (z-index: 1) + transparent painting canvas (z-index: 2)
 - **Server-Side Processing**: Image optimization and API calls on server
 - **Type Safety**: Full TypeScript coverage
 
@@ -86,6 +95,8 @@ The project is a functional AI image editing POC with mask-based editing capabil
 ## Important Patterns & Learnings
 
 ### Canvas Implementation
+- **Layering Strategy**: Background canvas for images, transparent painting canvas for masks
+- **Initialization**: Use `clearRect()` for transparent canvas, not `fillRect()` with white
 - **Brush System**: Configurable size and opacity for mask painting
 - **Export Strategy**: Base64 data URLs for API transmission
 - **Format Conversion**: Handle RGBA vs grayscale mask requirements
@@ -112,7 +123,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 4. **Deployment**: Not recommended for production use
 
 ## Key Files to Monitor
-- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface
+- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (recently fixed)
 - `lib/providers/`: Provider implementations and factory
 - `app/api/mask-edit-image/route.ts`: Core API endpoint
 - `lib/config.ts`: Configuration and feature flags

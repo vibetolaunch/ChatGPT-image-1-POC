@@ -139,12 +139,12 @@ export default function UnifiedPaintingCanvas() {
 
       setCanvasState({ scale, offsetX, offsetY, displayWidth, displayHeight })
 
-      // Initialize painting canvas with white background
+      // Initialize painting canvas as transparent
       const paintingCtx = paintingCanvas.getContext('2d')
       if (paintingCtx) {
-        paintingCtx.fillStyle = '#ffffff'
-        paintingCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        // Initialize history with the white canvas
+        // Clear the canvas to make it transparent
+        paintingCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        // Initialize history with the transparent canvas
         const imageData = paintingCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         historyRef.current = [imageData]
         historyIndexRef.current = 0
@@ -384,8 +384,8 @@ export default function UnifiedPaintingCanvas() {
     const paintingCanvas = paintingCanvasRef.current
     const ctx = paintingCanvas?.getContext('2d')
     if (ctx) {
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      // Clear the canvas to make it transparent
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
       saveToHistory()
     }
   }
