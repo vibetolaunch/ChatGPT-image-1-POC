@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 
 interface ToolState {
-  activeTool: 'brush' | 'eraser' | 'upload' | 'mask'
+  activeTool: 'brush' | 'eraser' | 'upload' | 'export' | 'mask'
   brushSize: number
   brushOpacity: number
   brushColor: string
@@ -21,6 +21,8 @@ interface FloatingToolPanelProps {
   showMask?: boolean
   onToggleMask?: () => void
   onAIGenerate?: () => void
+  onExportPNG?: () => void
+  onExportJPG?: (quality: number) => void
 }
 
 interface Position {
@@ -39,7 +41,9 @@ export default function FloatingToolPanel({
   canRedo,
   showMask = false,
   onToggleMask,
-  onAIGenerate
+  onAIGenerate,
+  onExportPNG,
+  onExportJPG
 }: FloatingToolPanelProps) {
   const [position, setPosition] = useState<Position>({ x: 20, y: 20 })
   const [isDragging, setIsDragging] = useState(false)
@@ -228,6 +232,7 @@ export default function FloatingToolPanel({
     { tool: 'brush' as const, icon: '🖌️', label: 'Brush' },
     { tool: 'eraser' as const, icon: '🧽', label: 'Eraser' },
     { tool: 'upload' as const, icon: '📁', label: 'Upload' },
+    { tool: 'export' as const, icon: '💾', label: 'Export' },
     { tool: 'mask' as const, icon: '🎭', label: 'Mask' }
   ]
 
@@ -397,6 +402,33 @@ export default function FloatingToolPanel({
                       AI Generate
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Export-specific buttons */}
+            {toolState.activeTool === 'export' && (
+              <div className="space-y-2 border-t border-gray-200/50 pt-2">
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-gray-600">Export Format</span>
+                  <div className="flex gap-1">
+                    {onExportPNG && (
+                      <button
+                        onClick={onExportPNG}
+                        className="flex-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                      >
+                        PNG
+                      </button>
+                    )}
+                    {onExportJPG && (
+                      <button
+                        onClick={() => onExportJPG(85)}
+                        className="flex-1 px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                      >
+                        JPG
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

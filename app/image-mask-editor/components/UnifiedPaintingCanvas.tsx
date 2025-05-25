@@ -24,7 +24,7 @@ interface BackgroundImage {
   height: number;
 }
 
-type ToolType = 'brush' | 'eraser' | 'upload' | 'mask'
+type ToolType = 'brush' | 'eraser' | 'upload' | 'export' | 'mask'
 
 interface ToolState {
   activeTool: ToolType;
@@ -488,6 +488,129 @@ export default function UnifiedPaintingCanvas() {
     }
   }, [saveToHistory])
 
+  // Export functions
+  const handleExportPNG = useCallback(() => {
+    try {
+      setError(null)
+
+      // Create a temporary canvas to combine layers
+      const exportCanvas = document.createElement('canvas')
+      const exportCtx = exportCanvas.getContext('2d')
+      
+      if (!exportCtx) {
+        throw new Error('Could not create export canvas')
+      }
+
+      // Set canvas dimensions
+      exportCanvas.width = CANVAS_WIDTH
+      exportCanvas.height = CANVAS_HEIGHT
+
+      // Fill with white background for PNG
+      exportCtx.fillStyle = '#ffffff'
+      exportCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+      // Draw background image if present
+      if (editorState.backgroundImage) {
+        const backgroundCanvas = canvasRef.current?.getBackgroundCanvas()
+        if (backgroundCanvas) {
+          exportCtx.drawImage(backgroundCanvas, 0, 0)
+        }
+      }
+
+      // Draw painting layer on top
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (paintingCanvas) {
+        exportCtx.drawImage(paintingCanvas, 0, 0)
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `canvas-export-${timestamp}.png`
+
+      // Convert to blob and download
+      exportCanvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+        }
+      }, 'image/png')
+
+      // Clean up
+      exportCanvas.remove()
+
+    } catch (err: any) {
+      console.error('PNG export error:', err)
+      setError(err?.message || 'Failed to export as PNG')
+    }
+  }, [editorState.backgroundImage])
+
+  const handleExportJPG = useCallback((quality: number = 85) => {
+    try {
+      setError(null)
+
+      // Create a temporary canvas to combine layers
+      const exportCanvas = document.createElement('canvas')
+      const exportCtx = exportCanvas.getContext('2d')
+      
+      if (!exportCtx) {
+        throw new Error('Could not create export canvas')
+      }
+
+      // Set canvas dimensions
+      exportCanvas.width = CANVAS_WIDTH
+      exportCanvas.height = CANVAS_HEIGHT
+
+      // Fill with white background for JPG (JPG doesn't support transparency)
+      exportCtx.fillStyle = '#ffffff'
+      exportCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+      // Draw background image if present
+      if (editorState.backgroundImage) {
+        const backgroundCanvas = canvasRef.current?.getBackgroundCanvas()
+        if (backgroundCanvas) {
+          exportCtx.drawImage(backgroundCanvas, 0, 0)
+        }
+      }
+
+      // Draw painting layer on top
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (paintingCanvas) {
+        exportCtx.drawImage(paintingCanvas, 0, 0)
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const filename = `canvas-export-${timestamp}.jpg`
+
+      // Convert to blob and download
+      exportCanvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+        }
+      }, 'image/jpeg', quality / 100)
+
+      // Clean up
+      exportCanvas.remove()
+
+    } catch (err: any) {
+      console.error('JPG export error:', err)
+      setError(err?.message || 'Failed to export as JPG')
+    }
+  }, [editorState.backgroundImage])
+
   // Add event listeners to the painting canvas for drawing
   useEffect(() => {
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
@@ -543,6 +666,8 @@ export default function UnifiedPaintingCanvas() {
         showMask={showMask}
         onToggleMask={handleToggleMask}
         onAIGenerate={handleAIGenerate}
+        onExportPNG={handleExportPNG}
+        onExportJPG={handleExportJPG}
       />
 
       {/* Edge-to-Edge Canvas */}
