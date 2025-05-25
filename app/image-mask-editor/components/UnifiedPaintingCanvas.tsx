@@ -71,6 +71,7 @@ export default function UnifiedPaintingCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
   const paintingCanvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Drawing state refs
   const lastPointRef = useRef<{ x: number; y: number } | null>(null)
@@ -300,8 +301,7 @@ export default function UnifiedPaintingCanvas() {
   }, [isDrawing, saveToHistory])
 
   // File upload handler
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
+  const handleFileUpload = useCallback(async (file: File) => {
     if (!file) return
 
     try {
@@ -369,6 +369,30 @@ export default function UnifiedPaintingCanvas() {
     }
   }, [])
 
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0]
+    if (file) {
+      await handleFileUpload(file)
+    }
+  }, [handleFileUpload])
+
+  // Handle file input change
+  const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      await handleFileUpload(file)
+    }
+    // Reset the input so the same file can be selected again
+    e.target.value = ''
+  }, [handleFileUpload])
+
+  // Handle upload button click
+  const handleUploadClick = useCallback(() => {
+    if (toolState.activeTool === 'upload') {
+      fileInputRef.current?.click()
+    }
+  }, [toolState.activeTool])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -376,7 +400,8 @@ export default function UnifiedPaintingCanvas() {
     },
     maxFiles: 1,
     disabled: isUploading,
-    noClick: toolState.activeTool !== 'upload'
+    noClick: true, // Disable click to upload, only allow drag and drop
+    noDrag: toolState.activeTool !== 'upload' // Only allow drag when upload tool is active
   })
 
   // Clear functions
@@ -391,8 +416,15 @@ export default function UnifiedPaintingCanvas() {
   }
 
   return (
-    <div className="w-full h-screen flex flex-col" {...getRootProps()}>
-      <input {...getInputProps()} />
+    <div className="w-full h-screen flex flex-col">
+      {/* Hidden file input for upload functionality */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
       
       {/* Error display */}
       {error && (
@@ -419,7 +451,12 @@ export default function UnifiedPaintingCanvas() {
             ].map(({ tool, icon, label }) => (
               <button
                 key={tool}
-                onClick={() => setToolState(prev => ({ ...prev, activeTool: tool }))}
+                onClick={() => {
+                  setToolState(prev => ({ ...prev, activeTool: tool }))
+                  if (tool === 'upload') {
+                    handleUploadClick()
+                  }
+                }}
                 className={`px-3 py-2 text-sm font-medium flex items-center gap-1 ${
                   toolState.activeTool === tool
                     ? 'bg-blue-500 text-white'

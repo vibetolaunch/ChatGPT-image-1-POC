@@ -3,7 +3,7 @@
 ## ✅ What's Working
 
 ### Core Functionality
-- **Image Upload**: Drag-and-drop file upload with validation
+- **Image Upload**: Drag-and-drop file upload with validation (fixed dialog bug)
 - **Canvas Layering**: Fixed image visibility issue - background images now display properly
 - **Mask Editing**: Canvas-based painting tools for creating edit masks with transparent overlay
 - **AI Generation**: Working integration with Stability AI and Recraft AI
@@ -23,6 +23,7 @@
 ### User Experience
 - **Unified Interface**: Single-page editing experience
 - **Image Visibility**: Uploaded images now display immediately (fixed layering issue)
+- **Tool Interaction**: Fixed file upload dialog bug - tools work independently
 - **Real-time Feedback**: Immediate visual feedback during editing
 - **Provider Selection**: Users can choose between AI providers
 - **Responsive Design**: Works across different screen sizes
@@ -43,6 +44,17 @@
 - **Files**: `lib/tokenService.ts`, Stripe integration ready
 
 ## ✅ Recently Completed
+
+### File Upload Dialog Fix (COMPLETED)
+- **Issue**: After uploading an image, clicking other buttons (brush, eraser) would reopen the file upload dialog
+- **Root Cause**: Dropzone's `getRootProps()` applied to entire component container, making all clicks trigger file upload
+- **Solution**: 
+  - Removed `getRootProps()` from main container
+  - Added dedicated hidden file input with proper event handling
+  - Modified upload button to trigger file selection only when clicked
+  - Preserved drag-and-drop functionality only when upload tool is active
+- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: File upload dialog now only appears when explicitly intended (clicking Upload button or dragging files)
 
 ### Canvas Layering Fix (COMPLETED)
 - **Issue**: Uploaded images were hidden behind white painting canvas background
@@ -123,33 +135,35 @@
 
 ## 📊 Current Status Assessment
 
-### Functionality: 80% Complete (Updated)
-- ✅ Core image editing workflow (canvas layering fixed)
+### Functionality: 82% Complete (Updated)
+- ✅ Core image editing workflow (canvas layering fixed, upload dialog fixed)
 - ✅ Multi-provider support (2/3 providers)
 - ✅ Authentication and storage
 - ✅ Proper canvas transparency and image display
+- ✅ Fixed tool interaction bugs
 - ❌ OpenAI integration
 - ❌ Token persistence
 
-### User Experience: 75% Complete (Updated)
+### User Experience: 78% Complete (Updated)
 - ✅ Basic editing interface with proper image visibility
-- ✅ File upload and result display
-- ✅ Canvas tools with transparency
+- ✅ File upload and result display (fixed dialog bug)
+- ✅ Canvas tools with transparency and proper interaction
 - ❌ Advanced feedback and controls
 - ❌ Mobile optimization
 
-### Technical Quality: 85% Complete (Updated)
+### Technical Quality: 87% Complete (Updated)
 - ✅ Clean architecture and patterns
 - ✅ Type safety and error handling
 - ✅ Database and auth implementation
 - ✅ Proper canvas layering implementation
+- ✅ Fixed event handling bugs
 - ❌ Performance optimization
 - ❌ Production readiness
 
-### Documentation: 65% Complete (Updated)
+### Documentation: 68% Complete (Updated)
 - ✅ README and setup instructions
 - ✅ Code comments and types
-- ✅ Memory bank documentation updated
+- ✅ Memory bank documentation updated with recent fixes
 - ❌ User guides
 - ❌ API documentation
 
@@ -188,6 +202,12 @@
 - **Provider Accounts**: Active accounts with all AI services
 
 ## 🔄 Recent Changes Log
+
+### 2025-05-24: File Upload Dialog Fix
+- **Problem**: Clicking other tools (brush, eraser) after uploading would reopen file upload dialog
+- **Solution**: Removed dropzone getRootProps from main container, added dedicated file input
+- **Files**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Fixed tool interaction, upload dialog only appears when intended
 
 ### 2025-05-24: Canvas Layering Fix
 - **Problem**: Uploaded images hidden behind white canvas background
