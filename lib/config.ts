@@ -20,7 +20,7 @@ export const supabaseConfig = {
 
 // Image model configuration
 export const imageModels = {
-  default: 'stabilityai', // Changed default
+  default: 'stabilityai', // Changed back to Stability AI as requested
   models: {
     stabilityai: {
       name: 'Stability AI',

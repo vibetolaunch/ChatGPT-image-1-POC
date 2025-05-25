@@ -45,10 +45,19 @@ export class StabilityAiProvider implements ImageProvider {
     const processedMaskBuffer = await this.convertMaskToGrayscaleForStability(mask, 'MASK_IMAGE_WHITE');
     console.log('Mask prepared for Stability AI.');
 
-    // 3. Image and Mask Resizing
+    // 3. Image and Mask Resizing - ensure both have EXACTLY the same dimensions
     const { resizedBuffer: resizedImageBuffer, width: finalImageWidth, height: finalImageHeight } = await this.resizeImageForStability(image);
-    const { resizedBuffer: resizedMaskBuffer } = await this.resizeImageForStability(processedMaskBuffer, true); // Resize mask to same dimensions
-    console.log(`Image and mask resized to ${finalImageWidth}x${finalImageHeight}`);
+    
+    // Resize mask to EXACTLY the same dimensions as the resized image
+    const resizedMaskBuffer = await sharp(processedMaskBuffer)
+      .resize(finalImageWidth, finalImageHeight, {
+        fit: 'fill', // Force exact dimensions
+        kernel: sharp.kernel.nearest
+      })
+      .png()
+      .toBuffer();
+    
+    console.log(`Image and mask both resized to exactly ${finalImageWidth}x${finalImageHeight}`);
 
     // 4. API Call
     const formData = new FormData();
@@ -179,50 +188,64 @@ export class StabilityAiProvider implements ImageProvider {
   ): Promise<Buffer> {
     console.log(`Converting RGBA mask to grayscale for Stability AI (mask source: ${maskSourceType})...`);
     
-    let sharpInstance = sharp(rgbaMaskBuffer).grayscale(); // Convert to grayscale first
-
-    // If white is the edit area (transparent in original RGBA becomes white in grayscale)
-    // and black is the keep area (opaque in original RGBA becomes black in grayscale)
-    // The default grayscale conversion might be okay if alpha was handled correctly before this.
-    // Typically, for inpainting, white pixels in the mask denote the area to be inpainted.
-    // If MASK_IMAGE_WHITE: areas to change are white.
-    // If MASK_IMAGE_BLACK: areas to change are black.
+    // The frontend canvas creates a mask where:
+    // - User paints with black brush (opaque black pixels) = areas to EDIT
+    // - Transparent areas = areas to KEEP
     
-    // Assuming the input RGBA mask has transparency for areas to edit:
-    // Transparent (alpha=0) areas should become WHITE if maskSourceType is MASK_IMAGE_WHITE
-    // Opaque (alpha=255) areas should become BLACK if maskSourceType is MASK_IMAGE_WHITE
-
-    // To ensure pure black and white, we can threshold.
-    // The threshold value depends on how the initial grayscale conversion handles alpha.
-    // If transparent becomes white-ish and opaque becomes black-ish:
-    // A threshold around 128 would make light grays white and dark grays black.
-
-    // Let's assume the mask from the client (after TLDRAW or Canvas)
-    // has black for masked (edit) areas and white (or transparent) for unmasked.
-    // If mask is black (0) for edit, white (255) for keep:
-    //  - For MASK_IMAGE_WHITE: need to invert: black -> white, white -> black
-    //  - For MASK_IMAGE_BLACK: keep as is.
-
-    // The RecraftProvider's convertMaskToGrayscale does:
-    // .grayscale().threshold().png()
-    // This results in a binary image. We need to know if 0 is black or white.
-    // Sharp's threshold defaults to 127, values <= 127 become black (0), > 127 become white (255).
-
-    // Let's assume our input mask (e.g. from drawing tool) uses:
-    // - Opaque color (e.g. black) for areas to KEEP.
-    // - Transparent for areas to EDIT.
-    // When converted to grayscale:
-    // - Opaque black -> 0 (black)
-    // - Transparent -> 255 (white) (if background for flatten is white, or if alpha is treated as white)
-    // So, white (255) is the edit area. This matches MASK_IMAGE_WHITE.
-
-    const processedMask = await sharpInstance
-      .threshold() // Ensure binary black/white
-      .png() // Output as PNG
-      .toBuffer();
+    // For Stability AI with MASK_IMAGE_WHITE:
+    // - WHITE pixels = areas to edit (inpaint)
+    // - BLACK pixels = areas to keep (preserve)
+    
+    // So we need to INVERT the mask: black painted areas -> white, transparent -> black
+    
+    // First, convert RGBA to grayscale and get raw pixel data
+    const { data: maskData, info } = await sharp(rgbaMaskBuffer)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    
+    const { width, height, channels } = info;
+    console.log(`Processing mask: ${width}x${height}, channels: ${channels}`);
+    
+    // Create inverted binary mask
+    const invertedMask = Buffer.alloc(width * height);
+    
+    for (let i = 0; i < width * height; i++) {
+      const pixelIndex = i * channels;
+      
+      if (channels === 4) { // RGBA
+        const alpha = maskData[pixelIndex + 3];
+        // If alpha > 0, there's painted content (user wants to edit this area)
+        // For MASK_IMAGE_WHITE: painted areas should be WHITE (255)
+        // Transparent areas should be BLACK (0)
+        invertedMask[i] = alpha > 0 ? 255 : 0;
+      } else if (channels === 3) { // RGB
+        const r = maskData[pixelIndex];
+        const g = maskData[pixelIndex + 1];
+        const b = maskData[pixelIndex + 2];
+        // If it's dark (painted), make it white for editing
+        const brightness = (r + g + b) / 3;
+        invertedMask[i] = brightness < 128 ? 255 : 0;
+      } else { // Grayscale
+        const gray = maskData[pixelIndex];
+        // If it's dark (painted), make it white for editing
+        invertedMask[i] = gray < 128 ? 255 : 0;
+      }
+    }
+    
+    // Create final binary PNG mask
+    const processedMask = await sharp(invertedMask, {
+      raw: {
+        width,
+        height,
+        channels: 1
+      }
+    })
+    .png()
+    .toBuffer();
     
     const outputMetadata = await sharp(processedMask).metadata();
-    console.log('Output mask for Stability (binary PNG) metadata:', outputMetadata);
+    console.log('Output mask for Stability (inverted binary PNG) metadata:', outputMetadata);
+    console.log('Mask conversion: painted areas (black) -> white (edit), transparent -> black (keep)');
     
     return processedMask;
   }
