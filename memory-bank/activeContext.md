@@ -1,11 +1,22 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. The main interface is the `UnifiedPaintingCanvas` component which provides a complete image editing workflow. **Recent Fix**: Resolved canvas layering issue where uploaded images were hidden behind white background.
+The project is a functional AI image editing POC with mask-based editing capabilities. The main interface is the `UnifiedPaintingCanvas` component which provides a complete image editing workflow. **Recent Fix**: Resolved file upload dialog bug where clicking other tools would unexpectedly trigger file upload.
 
 ## Recent Focus Areas
 
-### 1. **Canvas Layering Fix (COMPLETED)**
+### 1. **File Upload Dialog Fix (COMPLETED)**
+- **Issue**: After uploading an image, clicking other buttons (brush, eraser) would reopen the file upload dialog
+- **Root Cause**: Dropzone's `getRootProps()` applied to entire component container, making all clicks trigger file upload
+- **Solution**: 
+  - Removed `getRootProps()` from main container
+  - Added dedicated hidden file input with proper event handling
+  - Modified upload button to trigger file selection only when clicked
+  - Preserved drag-and-drop functionality only when upload tool is active
+- **Impact**: File upload dialog now only appears when explicitly intended (clicking Upload button or dragging files)
+- **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+
+### 2. **Canvas Layering Fix (COMPLETED)**
 - **Issue**: Uploaded images were hidden behind white painting canvas background
 - **Root Cause**: Painting canvas initialized with white fill instead of transparent
 - **Solution**: Changed canvas initialization from `fillRect()` to `clearRect()` for transparency
