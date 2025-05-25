@@ -210,6 +210,20 @@ export default function FloatingToolPanel({
     }
   }, [isCollapsed, updatePanelDimensions, isDragging, repositionIfOffScreen])
 
+  // Update dimensions and reposition when active tool changes (e.g., switching to mask mode)
+  useEffect(() => {
+    if (!isDragging && !isCollapsed) {
+      // Small delay to allow DOM to update after tool change
+      const timeoutId = setTimeout(() => {
+        updatePanelDimensions()
+        // Check if we need to reposition to stay on screen after tool change
+        // This is especially important when switching to mask mode which adds extra content
+        setTimeout(repositionIfOffScreen, 50)
+      }, 100)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [toolState.activeTool, updatePanelDimensions, isDragging, isCollapsed, repositionIfOffScreen])
+
   const tools = [
     { tool: 'brush' as const, icon: '🖌️', label: 'Brush' },
     { tool: 'eraser' as const, icon: '🧽', label: 'Eraser' },
@@ -239,9 +253,6 @@ export default function FloatingToolPanel({
           className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-b border-gray-200/30 cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-            <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
           </div>
           <span className="text-xs font-medium text-gray-600">Tools</span>
           <button

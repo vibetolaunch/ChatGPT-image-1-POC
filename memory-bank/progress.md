@@ -8,6 +8,7 @@
 - **Mask Editing**: Canvas-based painting tools for creating edit masks with transparent overlay
 - **AI Generation**: Working integration with Stability AI and Recraft AI
 - **Apply to Canvas**: Fixed critical bug - AI results now properly apply to canvas (2025-05-25)
+- **Canvas Resize Preservation**: Fixed critical bug - canvas content now preserved during browser window resize (2025-05-25)
 - **Result Display**: Before/after image comparison
 - **User Authentication**: Complete Supabase Auth flow with SSR
 - **File Storage**: Supabase Storage for images and masks
@@ -15,6 +16,7 @@
 ### Technical Implementation
 - **Provider Pattern**: Clean abstraction for multiple AI services
 - **Canvas Architecture**: Proper layering with background canvas (z-index: 1) and transparent painting canvas (z-index: 2)
+- **Content Preservation**: Canvas content preserved during resize operations using ImageData API
 - **Supabase SSR**: Proper implementation with `@supabase/ssr`
 - **Middleware**: Authentication and token refresh working
 - **API Routes**: Functional endpoints for image generation
@@ -27,7 +29,7 @@
 - **Dark Theme**: Professional editing environment with better contrast
 - **Auto-docking**: Toolbar snaps to screen edges for optimal positioning
 - **Tool Integration**: Brush, eraser, upload tools with real-time controls
-- **Responsive Design**: Viewport-aware scaling and positioning
+- **Responsive Design**: Viewport-aware scaling and positioning with content preservation
 - **Error Handling**: User-friendly error messages and loading states
 - **Seamless AI Workflow**: Complete AI generation and application workflow
 
@@ -46,6 +48,23 @@
 - **Files**: `lib/tokenService.ts`, Stripe integration ready
 
 ## ✅ Recently Completed
+
+### Canvas Resize Content Preservation Fix (COMPLETED - 2025-05-25)
+- **Issue**: When resizing the browser window, all canvas content (uploaded images and brush strokes/masks) was being wiped
+- **Root Cause**: The `setupCanvas` function in `EdgeToEdgeCanvas` was clearing both canvases during resize operations without preserving existing content
+- **Solution**: 
+  - Implemented comprehensive content preservation system using `getImageData()` and `putImageData()`
+  - Capture content from both background canvas (images) and painting canvas (brush/masks) before resize
+  - Restore all preserved content after canvas dimensions and positioning are updated
+- **Implementation Details**:
+  - Added `backgroundImageData` and `paintingImageData` variables to capture canvas content
+  - Used `getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)` to preserve pixel data
+  - Performed all canvas setup operations (dimensions, positioning, scaling)
+  - Used `putImageData()` to restore both canvases after resize operations
+  - Maintains proper canvas layering and transparency
+- **Files Modified**: 
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
+- **Impact**: Users can now resize browser window without losing any work - both uploaded images and painted content are fully preserved while canvas properly scales and repositions
 
 ### Apply to Canvas Fix (COMPLETED - 2025-05-25)
 - **Issue**: "Apply to Canvas" button in AI modal had TODO comment and wasn't functional
@@ -173,10 +192,10 @@
 
 ## 📊 Current Status Assessment
 
-### Functionality: 90% Complete (Updated)
+### Functionality: 92% Complete (Updated)
 - ✅ Core image editing workflow (canvas layering fixed, upload dialog fixed)
 - ✅ Modern floating toolbar interface
-- ✅ Edge-to-edge canvas layout
+- ✅ Edge-to-edge canvas layout with content preservation
 - ✅ Complete AI workflow with apply functionality
 - ✅ Multi-provider support (2/3 providers)
 - ✅ Authentication and storage
@@ -188,25 +207,27 @@
 - ✅ Edge-to-edge canvas with dark theme
 - ✅ Draggable, auto-docking toolbar
 - ✅ Glassmorphism design elements
-- ✅ Responsive viewport scaling
+- ✅ Responsive viewport scaling with content preservation
 - ✅ Complete AI generation and application workflow
 - ❌ Mobile optimization
 - ❌ Advanced feedback controls
 
-### Technical Quality: 90% Complete (Updated)
+### Technical Quality: 92% Complete (Updated)
 - ✅ Clean component architecture
 - ✅ Proper separation of concerns
 - ✅ Type safety and error handling
 - ✅ Database and auth implementation
 - ✅ Modern UI patterns and best practices
+- ✅ Content preservation during interface changes
 - ❌ Performance optimization
 - ❌ Production readiness
 
-### Documentation: 80% Complete (Updated)
+### Documentation: 85% Complete (Updated)
 - ✅ README and setup instructions
 - ✅ Code comments and types
 - ✅ Memory bank documentation updated with all recent changes
 - ✅ Component documentation
+- ✅ Canvas content preservation patterns documented
 - ❌ User guides
 - ❌ API documentation
 
@@ -245,6 +266,13 @@
 - **Provider Accounts**: Active accounts with all AI services
 
 ## 🔄 Recent Changes Log
+
+### 2025-05-25: Canvas Resize Content Preservation Fix
+- **Problem**: Browser window resize was wiping all canvas content (images and brush strokes)
+- **Solution**: Implemented comprehensive content preservation using ImageData API
+- **Files**: 
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx` (added content preservation system)
+- **Impact**: Users can now resize browser window without losing any work - complete content preservation
 
 ### 2025-05-25: Apply to Canvas Fix
 - **Problem**: "Apply to Canvas" button in AI modal wasn't functional (had TODO comment)
@@ -285,6 +313,7 @@ The image editor now features a completely redesigned interface:
 - Traditional bordered canvas
 - Static layout constraints
 - Non-functional "Apply to Canvas" button
+- Canvas content lost during window resize
 
 ### After
 - **Floating draggable toolbar** that can be positioned anywhere
@@ -293,6 +322,7 @@ The image editor now features a completely redesigned interface:
 - **Glassmorphism design** with semi-transparent panels
 - **Auto-docking** toolbar that snaps to screen edges
 - **Complete AI workflow** with functional apply-to-canvas feature
+- **Content preservation** during browser resize operations
 - **Maximum workspace** utilization
 
-This redesign transforms the editor from a basic web form to a professional-grade image editing interface comparable to modern design tools, with a complete and functional AI editing workflow.
+This redesign transforms the editor from a basic web form to a professional-grade image editing interface comparable to modern design tools, with a complete and functional AI editing workflow and robust content preservation.

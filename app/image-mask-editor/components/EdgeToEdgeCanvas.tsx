@@ -73,6 +73,19 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
       return
     }
 
+    // Preserve both canvas contents before resize
+    const backgroundCtx = backgroundCanvas.getContext('2d')
+    const paintingCtx = paintingCanvas.getContext('2d')
+    let backgroundImageData: ImageData | null = null
+    let paintingImageData: ImageData | null = null
+    
+    if (backgroundCtx) {
+      backgroundImageData = backgroundCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    }
+    if (paintingCtx) {
+      paintingImageData = paintingCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    }
+
     // Use full viewport dimensions
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
@@ -105,10 +118,12 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
     canvasStateRef.current = newCanvasState
     onCanvasStateChange(newCanvasState)
 
-    // Initialize painting canvas as transparent
-    const paintingCtx = paintingCanvas.getContext('2d')
-    if (paintingCtx) {
-      paintingCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    // Restore both canvas contents after resize
+    if (backgroundCtx && backgroundImageData) {
+      backgroundCtx.putImageData(backgroundImageData, 0, 0)
+    }
+    if (paintingCtx && paintingImageData) {
+      paintingCtx.putImageData(paintingImageData, 0, 0)
     }
   }, [onCanvasStateChange])
 
