@@ -1,11 +1,28 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize.
 
 ## Recent Focus Areas
 
-### 1. **Apply to Canvas Fix (COMPLETED - 2025-05-25)**
+### 1. **Canvas Resize Content Preservation Fix (COMPLETED - 2025-05-25)**
+- **Issue**: When resizing the browser window, all canvas content (uploaded images and brush strokes/masks) was being wiped
+- **Root Cause**: The `setupCanvas` function in `EdgeToEdgeCanvas` was clearing both canvases during resize operations without preserving existing content
+- **Solution**: 
+  - Implemented comprehensive content preservation system using `getImageData()` and `putImageData()`
+  - Capture content from both background canvas (images) and painting canvas (brush/masks) before resize
+  - Restore all preserved content after canvas dimensions and positioning are updated
+- **Implementation Details**:
+  - Added `backgroundImageData` and `paintingImageData` variables to capture canvas content
+  - Used `getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)` to preserve pixel data
+  - Performed all canvas setup operations (dimensions, positioning, scaling)
+  - Used `putImageData()` to restore both canvases after resize operations
+  - Maintains proper canvas layering and transparency
+- **Files Modified**: 
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
+- **Impact**: Users can now resize browser window without losing any work - both uploaded images and painted content are fully preserved while canvas properly scales and repositions
+
+### 2. **Apply to Canvas Fix (COMPLETED - 2025-05-25)**
 - **Issue**: "Apply to Canvas" button in AI modal had TODO comment and wasn't functional
 - **Root Cause**: Button only closed modal without applying the AI-generated result
 - **Solution**: 
@@ -22,7 +39,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 - **Impact**: Users can now seamlessly apply AI edits to canvas and continue editing
 
-### 2. **Floating Toolbar Redesign (COMPLETED)**
+### 3. **Floating Toolbar Redesign (COMPLETED)**
 - **Implementation**: Created `FloatingToolPanel.tsx` component with modern glassmorphism design
 - **Key Features**:
   - Draggable positioning anywhere on screen
@@ -37,7 +54,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Compact design maximizes canvas real estate
 - **Files Created**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 
-### 3. **Edge-to-Edge Canvas Layout (COMPLETED)**
+### 4. **Edge-to-Edge Canvas Layout (COMPLETED)**
 - **Implementation**: Created `EdgeToEdgeCanvas.tsx` for full-viewport canvas experience
 - **Key Features**:
   - Canvas extends from edge to edge of screen (no borders/frames)
@@ -53,7 +70,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Maximum canvas space utilization
 - **Files Created**: `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
 
-### 4. **Unified Canvas Refactor (COMPLETED)**
+### 5. **Unified Canvas Refactor (COMPLETED)**
 - **Major Refactor**: Completely rewrote `UnifiedPaintingCanvas.tsx` to integrate new components
 - **Architecture Changes**:
   - Replaced fixed toolbar with floating panel system
@@ -68,7 +85,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Enhanced error handling
 - **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 
-### 5. **Drag Performance Optimization (COMPLETED - 2025-05-25)**
+### 6. **Drag Performance Optimization (COMPLETED - 2025-05-25)**
 - **Issue**: Floating toolbar dragging was laggy and not performant
 - **Root Causes**:
   - Excessive re-renders during drag operations
@@ -90,7 +107,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 - **Performance Impact**: Eliminated lag during dragging, smooth 60fps movement
 
-### 6. **Auto-Repositioning Feature (COMPLETED - 2025-05-25)**
+### 7. **Auto-Repositioning Feature (COMPLETED - 2025-05-25)**
 - **Issue**: When expanding the floating toolbar, parts could extend off-screen making content inaccessible
 - **User Experience Problem**: Users would lose access to toolbar controls if panel expanded beyond viewport bounds
 - **Solution**: 
@@ -113,7 +130,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 - **UX Impact**: Users can now expand toolbar anywhere on screen without losing access to controls
 
-### 7. **Previous Fixes Maintained**
+### 8. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
@@ -128,6 +145,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Responsive Positioning**: Auto-docking and viewport-aware positioning
 - **Minimal Distractions**: Tools available but not intrusive
 - **Seamless Workflow**: AI results integrate directly into editing workflow
+- **Content Preservation**: All user work preserved during interface changes
 
 ### Technical Patterns (Enhanced)
 - **Component Separation**: Dedicated components for toolbar and canvas
@@ -136,6 +154,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Responsive Design**: Viewport-aware scaling and positioning
 - **State Management**: Centralized tool state with callback patterns
 - **Callback Architecture**: Parent-child communication through props
+- **Content Preservation**: Canvas content preservation during resize operations
 
 ### Configuration Choices
 - **Canvas Dimensions**: 800x600 base with responsive scaling
@@ -180,6 +199,13 @@ The project is a functional AI image editing POC with mask-based editing capabil
 
 ## Important Patterns & Learnings
 
+### Canvas Content Preservation Implementation
+- **ImageData API**: Use `getImageData()` and `putImageData()` for pixel-perfect content preservation
+- **Dual Canvas Preservation**: Preserve both background (images) and painting (masks/brushes) canvases
+- **Timing Considerations**: Capture content before any canvas operations, restore after all operations complete
+- **Memory Management**: ImageData objects are temporary and automatically garbage collected
+- **Error Handling**: Check for canvas context availability before attempting preservation operations
+
 ### Apply to Canvas Implementation
 - **Callback Pattern**: Use props to pass functions between parent and child components
 - **Image Loading**: Proper async handling of image loading with dimensions
@@ -201,6 +227,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Event Coordination**: Proper event handling between components
 - **Ref Communication**: Use imperative handles for canvas access
 - **Performance**: Efficient drawing with interpolated brush strokes
+- **Content Preservation**: Maintain user work during interface changes
 
 ### Component Design
 - **Separation of Concerns**: Distinct components for UI and canvas logic
@@ -218,7 +245,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 ## Key Files to Monitor
 - `app/image-mask-editor/components/AIPromptModal.tsx`: AI modal with apply functionality (UPDATED)
 - `app/image-mask-editor/components/FloatingToolPanel.tsx`: New floating toolbar (CREATED)
-- `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: New canvas layout (CREATED)
+- `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: New canvas layout with content preservation (UPDATED)
 - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (REFACTORED)
 - `lib/providers/`: Provider implementations and factory
 - `app/api/mask-edit-image/route.ts`: Core API endpoint
@@ -233,6 +260,7 @@ The image editor now features a modern, professional interface with:
 - **Glassmorphism design** with semi-transparent floating panels
 - **Auto-docking** toolbar that snaps to screen edges
 - **Functional AI integration** with working "Apply to Canvas" feature
+- **Content preservation** during browser resize operations
 - **Preserved functionality** with all existing features intact
 
-This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate, with a complete AI editing workflow.
+This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate, with a complete AI editing workflow and robust content preservation.
