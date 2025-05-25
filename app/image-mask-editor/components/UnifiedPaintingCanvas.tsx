@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone'
 import { createClientSupabaseClient } from '@/lib/supabase'
 import FloatingToolPanel from './FloatingToolPanel'
 import EdgeToEdgeCanvas, { EdgeToEdgeCanvasRef } from './EdgeToEdgeCanvas'
+import AIPromptModal from './AIPromptModal'
 
 // Types
 interface CanvasState {
@@ -23,7 +24,7 @@ interface BackgroundImage {
   height: number;
 }
 
-type ToolType = 'brush' | 'eraser' | 'upload'
+type ToolType = 'brush' | 'eraser' | 'upload' | 'mask'
 
 interface ToolState {
   activeTool: ToolType;
@@ -57,6 +58,10 @@ export default function UnifiedPaintingCanvas() {
   // UI state
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showMask, setShowMask] = useState(false)
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [isAIGenerating, setIsAIGenerating] = useState(false)
+  const [aiResult, setAiResult] = useState<string | undefined>()
   
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false)
@@ -345,6 +350,144 @@ export default function UnifiedPaintingCanvas() {
     setCanvasState(newState)
   }, [])
 
+  // Mask handlers
+  const handleToggleMask = useCallback(() => {
+    setShowMask(prev => !prev)
+  }, [])
+
+  const handleAIGenerate = useCallback(() => {
+    setShowAIModal(true)
+  }, [])
+
+  const handleAIPromptSubmit = useCallback(async (prompt: string) => {
+    if (!editorState.backgroundImage) {
+      setError('Please upload a background image first')
+      return
+    }
+
+    try {
+      setIsAIGenerating(true)
+      setError(null)
+
+      // Get the mask data from the painting canvas
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (!paintingCanvas) {
+        throw new Error('Canvas not available')
+      }
+
+      // Convert canvas to base64 data URL
+      const maskDataUrl = paintingCanvas.toDataURL('image/png')
+
+      // Debug: Check if mask has any content
+      const ctx = paintingCanvas.getContext('2d')
+      const imageData = ctx?.getImageData(0, 0, paintingCanvas.width, paintingCanvas.height)
+      const hasContent = imageData?.data.some(pixel => pixel !== 0)
+      
+      if (!hasContent) {
+        throw new Error('Please paint some areas with the mask tool before generating AI edits')
+      }
+
+      // Get user session for sessionId
+      const supabase = createClientSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        throw new Error('You must be logged in to use AI generation')
+      }
+
+      console.log('AI Generation Debug:', {
+        imagePath: editorState.backgroundImage.path,
+        maskDataLength: maskDataUrl.length,
+        prompt: prompt,
+        userId: user.id
+      })
+
+      // Create form data with correct field names
+      const formData = new FormData()
+      formData.append('imagePath', editorState.backgroundImage.path) // Use storage path, not URL
+      formData.append('maskData', maskDataUrl) // Use base64 data URL
+      formData.append('prompt', prompt)
+      formData.append('sessionId', user.id) // Use user ID as session ID
+
+      // Call the API
+      const response = await fetch('/api/mask-edit-image', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate image')
+      }
+
+      const result = await response.json()
+      
+      // The API returns an array of images, take the first one
+      if (result.images && result.images.length > 0) {
+        setAiResult(result.images[0].editedImageUrl)
+      } else {
+        throw new Error('No images returned from AI service')
+      }
+
+    } catch (err: any) {
+      console.error('AI generation error:', err)
+      setError(err?.message || 'An error occurred during AI generation')
+    } finally {
+      setIsAIGenerating(false)
+    }
+  }, [editorState.backgroundImage])
+
+  const handleAIModalClose = useCallback(() => {
+    setShowAIModal(false)
+    setAiResult(undefined)
+    setIsAIGenerating(false)
+  }, [])
+
+  // Apply AI result to canvas
+  const handleApplyToCanvas = useCallback(async (resultUrl: string) => {
+    try {
+      setError(null)
+
+      // Create a new background image object from the AI result
+      // We'll use a temporary ID and path since this is a generated image
+      const tempId = `ai-generated-${Date.now()}`
+      
+      // Get image dimensions
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = resultUrl
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
+
+      // Update the background image with the AI result
+      setEditorState(prev => ({
+        ...prev,
+        backgroundImage: {
+          url: resultUrl,
+          path: `ai-generated/${tempId}`,
+          id: tempId,
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        }
+      }))
+
+      // Clear the painting canvas (mask) since it's no longer needed
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      const ctx = paintingCanvas?.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        saveToHistory()
+      }
+
+    } catch (err: any) {
+      console.error('Apply to canvas error:', err)
+      setError(err?.message || 'Failed to apply image to canvas')
+    }
+  }, [saveToHistory])
+
   // Add event listeners to the painting canvas for drawing
   useEffect(() => {
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
@@ -397,6 +540,9 @@ export default function UnifiedPaintingCanvas() {
         onClear={clearCanvas}
         canUndo={historyIndexRef.current > 0}
         canRedo={historyIndexRef.current < historyRef.current.length - 1}
+        showMask={showMask}
+        onToggleMask={handleToggleMask}
+        onAIGenerate={handleAIGenerate}
       />
 
       {/* Edge-to-Edge Canvas */}
@@ -406,6 +552,18 @@ export default function UnifiedPaintingCanvas() {
         onCanvasStateChange={handleCanvasStateChange}
         isDragActive={isDragActive}
         isUploading={isUploading}
+        showMask={showMask}
+        activeTool={toolState.activeTool}
+      />
+
+      {/* AI Prompt Modal */}
+      <AIPromptModal
+        isOpen={showAIModal}
+        onClose={handleAIModalClose}
+        onSubmit={handleAIPromptSubmit}
+        onApplyToCanvas={handleApplyToCanvas}
+        isLoading={isAIGenerating}
+        result={aiResult}
       />
     </div>
   )

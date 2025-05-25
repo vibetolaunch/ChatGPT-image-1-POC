@@ -1,11 +1,28 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas.
 
 ## Recent Focus Areas
 
-### 1. **Floating Toolbar Redesign (COMPLETED)**
+### 1. **Apply to Canvas Fix (COMPLETED - 2025-05-25)**
+- **Issue**: "Apply to Canvas" button in AI modal had TODO comment and wasn't functional
+- **Root Cause**: Button only closed modal without applying the AI-generated result
+- **Solution**: 
+  - Added `onApplyToCanvas` callback prop to `AIPromptModal` component
+  - Implemented `handleApplyToCanvas` function in `UnifiedPaintingCanvas`
+  - Function loads AI result, updates background image, clears mask, saves to history
+- **Implementation Details**:
+  - AI result becomes new background image with proper dimensions
+  - Painting canvas (mask) automatically cleared since edit is applied
+  - State saved to history for undo functionality
+  - Error handling for image loading failures
+- **Files Modified**: 
+  - `app/image-mask-editor/components/AIPromptModal.tsx`
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Users can now seamlessly apply AI edits to canvas and continue editing
+
+### 2. **Floating Toolbar Redesign (COMPLETED)**
 - **Implementation**: Created `FloatingToolPanel.tsx` component with modern glassmorphism design
 - **Key Features**:
   - Draggable positioning anywhere on screen
@@ -20,7 +37,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Compact design maximizes canvas real estate
 - **Files Created**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 
-### 2. **Edge-to-Edge Canvas Layout (COMPLETED)**
+### 3. **Edge-to-Edge Canvas Layout (COMPLETED)**
 - **Implementation**: Created `EdgeToEdgeCanvas.tsx` for full-viewport canvas experience
 - **Key Features**:
   - Canvas extends from edge to edge of screen (no borders/frames)
@@ -36,7 +53,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Maximum canvas space utilization
 - **Files Created**: `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
 
-### 3. **Unified Canvas Refactor (COMPLETED)**
+### 4. **Unified Canvas Refactor (COMPLETED)**
 - **Major Refactor**: Completely rewrote `UnifiedPaintingCanvas.tsx` to integrate new components
 - **Architecture Changes**:
   - Replaced fixed toolbar with floating panel system
@@ -51,7 +68,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Enhanced error handling
 - **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 
-### 4. **Previous Fixes Maintained**
+### 5. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
@@ -65,6 +82,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Glassmorphism**: Modern semi-transparent floating panels
 - **Responsive Positioning**: Auto-docking and viewport-aware positioning
 - **Minimal Distractions**: Tools available but not intrusive
+- **Seamless Workflow**: AI results integrate directly into editing workflow
 
 ### Technical Patterns (Enhanced)
 - **Component Separation**: Dedicated components for toolbar and canvas
@@ -72,6 +90,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Event Delegation**: Proper pointer event handling for drawing
 - **Responsive Design**: Viewport-aware scaling and positioning
 - **State Management**: Centralized tool state with callback patterns
+- **Callback Architecture**: Parent-child communication through props
 
 ### Configuration Choices
 - **Canvas Dimensions**: 800x600 base with responsive scaling
@@ -116,6 +135,14 @@ The project is a functional AI image editing POC with mask-based editing capabil
 
 ## Important Patterns & Learnings
 
+### Apply to Canvas Implementation
+- **Callback Pattern**: Use props to pass functions between parent and child components
+- **Image Loading**: Proper async handling of image loading with dimensions
+- **State Updates**: Update background image state to reflect applied changes
+- **Canvas Management**: Clear painting canvas after applying edits
+- **History Integration**: Save state changes for undo functionality
+- **Error Handling**: Graceful handling of image loading failures
+
 ### Floating UI Implementation
 - **Drag Handling**: Use pointer events with proper offset calculations
 - **Boundary Constraints**: Keep panels within viewport bounds
@@ -144,6 +171,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 4. **Cross-browser Testing**: Ensure compatibility across browsers
 
 ## Key Files to Monitor
+- `app/image-mask-editor/components/AIPromptModal.tsx`: AI modal with apply functionality (UPDATED)
 - `app/image-mask-editor/components/FloatingToolPanel.tsx`: New floating toolbar (CREATED)
 - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: New canvas layout (CREATED)
 - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (REFACTORED)
@@ -159,6 +187,7 @@ The image editor now features a modern, professional interface with:
 - **Dark theme** for better visual contrast and professional appearance
 - **Glassmorphism design** with semi-transparent floating panels
 - **Auto-docking** toolbar that snaps to screen edges
+- **Functional AI integration** with working "Apply to Canvas" feature
 - **Preserved functionality** with all existing features intact
 
-This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate.
+This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate, with a complete AI editing workflow.

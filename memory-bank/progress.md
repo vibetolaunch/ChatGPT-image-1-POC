@@ -7,6 +7,7 @@
 - **Canvas Layering**: Fixed image visibility issue - background images now display properly
 - **Mask Editing**: Canvas-based painting tools for creating edit masks with transparent overlay
 - **AI Generation**: Working integration with Stability AI and Recraft AI
+- **Apply to Canvas**: Fixed critical bug - AI results now properly apply to canvas (2025-05-25)
 - **Result Display**: Before/after image comparison
 - **User Authentication**: Complete Supabase Auth flow with SSR
 - **File Storage**: Supabase Storage for images and masks
@@ -28,6 +29,7 @@
 - **Tool Integration**: Brush, eraser, upload tools with real-time controls
 - **Responsive Design**: Viewport-aware scaling and positioning
 - **Error Handling**: User-friendly error messages and loading states
+- **Seamless AI Workflow**: Complete AI generation and application workflow
 
 ## 🚧 What's In Progress
 
@@ -44,6 +46,23 @@
 - **Files**: `lib/tokenService.ts`, Stripe integration ready
 
 ## ✅ Recently Completed
+
+### Apply to Canvas Fix (COMPLETED - 2025-05-25)
+- **Issue**: "Apply to Canvas" button in AI modal had TODO comment and wasn't functional
+- **Root Cause**: Button only closed modal without applying the AI-generated result
+- **Solution**: 
+  - Added `onApplyToCanvas` callback prop to `AIPromptModal` component
+  - Implemented `handleApplyToCanvas` function in `UnifiedPaintingCanvas`
+  - Function loads AI result, updates background image, clears mask, saves to history
+- **Implementation Details**:
+  - AI result becomes new background image with proper dimensions
+  - Painting canvas (mask) automatically cleared since edit is applied
+  - State saved to history for undo functionality
+  - Error handling for image loading failures
+- **Files Modified**: 
+  - `app/image-mask-editor/components/AIPromptModal.tsx`
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Users can now seamlessly apply AI edits to canvas and continue editing
 
 ### UI Redesign - Floating Toolbar & Edge-to-Edge Canvas (COMPLETED)
 - **Implementation**: Complete UI overhaul with modern, professional interface
@@ -154,21 +173,23 @@
 
 ## 📊 Current Status Assessment
 
-### Functionality: 85% Complete (Updated)
+### Functionality: 90% Complete (Updated)
 - ✅ Core image editing workflow (canvas layering fixed, upload dialog fixed)
 - ✅ Modern floating toolbar interface
 - ✅ Edge-to-edge canvas layout
+- ✅ Complete AI workflow with apply functionality
 - ✅ Multi-provider support (2/3 providers)
 - ✅ Authentication and storage
 - ❌ OpenAI integration
 - ❌ Token persistence
 
-### User Experience: 92% Complete (Major Update)
+### User Experience: 95% Complete (Major Update)
 - ✅ Professional floating toolbar interface
 - ✅ Edge-to-edge canvas with dark theme
 - ✅ Draggable, auto-docking toolbar
 - ✅ Glassmorphism design elements
 - ✅ Responsive viewport scaling
+- ✅ Complete AI generation and application workflow
 - ❌ Mobile optimization
 - ❌ Advanced feedback controls
 
@@ -181,10 +202,10 @@
 - ❌ Performance optimization
 - ❌ Production readiness
 
-### Documentation: 75% Complete (Updated)
+### Documentation: 80% Complete (Updated)
 - ✅ README and setup instructions
 - ✅ Code comments and types
-- ✅ Memory bank documentation updated with UI redesign
+- ✅ Memory bank documentation updated with all recent changes
 - ✅ Component documentation
 - ❌ User guides
 - ❌ API documentation
@@ -225,6 +246,14 @@
 
 ## 🔄 Recent Changes Log
 
+### 2025-05-25: Apply to Canvas Fix
+- **Problem**: "Apply to Canvas" button in AI modal wasn't functional (had TODO comment)
+- **Solution**: Implemented complete callback system for applying AI results to canvas
+- **Files**: 
+  - `app/image-mask-editor/components/AIPromptModal.tsx` (added onApplyToCanvas prop)
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (added handleApplyToCanvas function)
+- **Impact**: Complete AI workflow now functional - users can generate and apply AI edits seamlessly
+
 ### 2025-05-24: UI Redesign - Floating Toolbar & Edge-to-Edge Canvas
 - **Implementation**: Complete interface overhaul with modern design
 - **New Files**: 
@@ -255,6 +284,7 @@ The image editor now features a completely redesigned interface:
 - Gray container backgrounds
 - Traditional bordered canvas
 - Static layout constraints
+- Non-functional "Apply to Canvas" button
 
 ### After
 - **Floating draggable toolbar** that can be positioned anywhere
@@ -262,6 +292,7 @@ The image editor now features a completely redesigned interface:
 - **Dark theme** for professional editing environment
 - **Glassmorphism design** with semi-transparent panels
 - **Auto-docking** toolbar that snaps to screen edges
+- **Complete AI workflow** with functional apply-to-canvas feature
 - **Maximum workspace** utilization
 
-This redesign transforms the editor from a basic web form to a professional-grade image editing interface comparable to modern design tools.
+This redesign transforms the editor from a basic web form to a professional-grade image editing interface comparable to modern design tools, with a complete and functional AI editing workflow.
