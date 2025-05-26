@@ -72,6 +72,11 @@ export default function UnifiedPaintingCanvas() {
     displayWidth: CANVAS_WIDTH,
     displayHeight: CANVAS_HEIGHT
   })
+  
+  // Color picker state to prevent painting while interacting with color picker
+  const [isColorPickerActive, setIsColorPickerActive] = useState(false)
+  const colorPickerTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const colorPickerDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Canvas refs
   const canvasRef = useRef<EdgeToEdgeCanvasRef>(null)
@@ -102,6 +107,99 @@ export default function UnifiedPaintingCanvas() {
     // Delay initialization to ensure canvas is ready
     const timer = setTimeout(initializeHistory, 100)
     return () => clearTimeout(timer)
+  }, [])
+
+  // Robust color picker interaction detection
+  useEffect(() => {
+    const handleColorPickerInteraction = (isActive: boolean) => {
+      console.log('Color picker interaction:', isActive ? 'started' : 'ended')
+      setIsColorPickerActive(isActive)
+      
+      // Clear existing timeouts
+      if (colorPickerTimeoutRef.current) {
+        clearTimeout(colorPickerTimeoutRef.current)
+        colorPickerTimeoutRef.current = null
+      }
+      
+      if (colorPickerDebounceRef.current) {
+        clearTimeout(colorPickerDebounceRef.current)
+        colorPickerDebounceRef.current = null
+      }
+      
+      if (!isActive) {
+        // When color picker closes, set a timeout to re-enable painting
+        colorPickerTimeoutRef.current = setTimeout(() => {
+          console.log('Color picker timeout expired, re-enabling painting')
+          setIsColorPickerActive(false)
+        }, 400) // 400ms delay to ensure color picker is fully closed
+      }
+    }
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement
+      if (target && (
+        target.id === 'color-picker' ||
+        (target as HTMLInputElement).type === 'color'
+      )) {
+        handleColorPickerInteraction(true)
+      }
+    }
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement
+      if (target && (
+        target.id === 'color-picker' ||
+        (target as HTMLInputElement).type === 'color'
+      )) {
+        // Use debounce to handle rapid focus changes
+        colorPickerDebounceRef.current = setTimeout(() => {
+          handleColorPickerInteraction(false)
+        }, 100)
+      }
+    }
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      
+      // Check if clicking on color picker elements
+      if (target && (
+        target.tagName === 'LABEL' && target.getAttribute('for') === 'color-picker' ||
+        target.id === 'color-picker' ||
+        (target as HTMLInputElement).type === 'color'
+      )) {
+        handleColorPickerInteraction(true)
+      }
+    }
+
+    const handleChange = (e: Event) => {
+      const target = e.target as HTMLInputElement
+      if (target && target.type === 'color') {
+        // Color changed, start the close sequence
+        colorPickerDebounceRef.current = setTimeout(() => {
+          handleColorPickerInteraction(false)
+        }, 150)
+      }
+    }
+
+    // Add event listeners
+    document.addEventListener('focusin', handleFocusIn)
+    document.addEventListener('focusout', handleFocusOut)
+    document.addEventListener('click', handleClick, true)
+    document.addEventListener('change', handleChange)
+
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn)
+      document.removeEventListener('focusout', handleFocusOut)
+      document.removeEventListener('click', handleClick, true)
+      document.removeEventListener('change', handleChange)
+      
+      if (colorPickerTimeoutRef.current) {
+        clearTimeout(colorPickerTimeoutRef.current)
+      }
+      if (colorPickerDebounceRef.current) {
+        clearTimeout(colorPickerDebounceRef.current)
+      }
+    }
   }, [])
 
   // Save canvas state to history
@@ -221,6 +319,13 @@ export default function UnifiedPaintingCanvas() {
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (toolState.activeTool === 'upload') return
 
+    // If color picker is active, ignore this click
+    if (isColorPickerActive) {
+      console.log('Ignoring canvas click - color picker is active')
+      e.preventDefault()
+      return
+    }
+
     e.preventDefault()
     setIsDrawing(true)
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
@@ -230,7 +335,7 @@ export default function UnifiedPaintingCanvas() {
     if (paintingCanvas) {
       drawOnCanvas(x, y, paintingCanvas, toolState.activeTool === 'eraser')
     }
-  }, [toolState, screenToCanvas, drawOnCanvas])
+  }, [toolState, screenToCanvas, drawOnCanvas, isColorPickerActive])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || !lastPointRef.current) return
