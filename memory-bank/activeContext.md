@@ -5,7 +5,24 @@ The project is a functional AI image editing POC with mask-based editing capabil
 
 ## Recent Focus Areas
 
-### 1. **Undo/Redo Functionality Fix (COMPLETED - 2025-05-25)**
+### 1. **Color Picker UI Fix (COMPLETED - 2025-05-25)**
+- **Issue**: Color picker button displayed a grey border inside the color swatch that couldn't be removed with CSS
+- **Root Cause**: Browser default styling for `<input type="color">` elements that overrides CSS attempts to remove borders
+- **Solution**: 
+  - Created custom color picker using hidden input + visible label approach
+  - Hidden the actual `<input type="color">` with `opacity-0` and `absolute` positioning
+  - Added visible `<label>` element that displays the current color as a clean swatch
+  - Connected label to input via `htmlFor="color-picker"` for proper functionality
+- **Implementation Details**:
+  - Replaced direct color input styling with hidden input + custom label
+  - Label shows current color via `backgroundColor` style property
+  - Maintains all functionality - clicking label opens full browser color picker
+  - Eliminates all browser-imposed styling while preserving accessibility
+- **Files Modified**: 
+  - `app/image-mask-editor/components/FloatingToolPanel.tsx`
+- **Impact**: Color picker now appears as a clean color swatch without any grey borders or visual artifacts
+
+### 2. **Undo/Redo Functionality Fix (COMPLETED - 2025-05-25)**
 - **Issue**: The redo button was not clickable even after performing undo operations
 - **Root Cause**: History management was using React refs (`historyRef`, `historyIndexRef`) instead of state, preventing the FloatingToolPanel from re-rendering when history changed
 - **Solution**: 
