@@ -44,7 +44,7 @@ const CANVAS_HEIGHT = 600
 // Mask pattern configuration
 const MASK_PATTERN_CONFIG = {
   stripeWidth: 12, // Width of each stripe (thick stripes)
-  stripeColor: 'rgba(138, 43, 226, 0.3)', // Electric purple, 30% transparent (more transparent)
+  stripeColor: 'rgba(138, 43, 226, 0.6)', // Electric purple, 60% transparent (more transparent)
   stripeAngle: 45, // Diagonal angle in degrees
   patternSize: 48 // Larger pattern size for better alignment
 }
@@ -91,8 +91,10 @@ export default function UnifiedPaintingCanvas() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const maskPatternRef = useRef<CanvasPattern | null>(null)
   
-  // Drawing state refs
+  // Drawing state refs - Updated for immediate drawing
   const lastPointRef = useRef<{ x: number; y: number } | null>(null)
+  const strokePointsRef = useRef<{ x: number; y: number }[]>([])
+  const strokeStartImageDataRef = useRef<ImageData | null>(null)
   
   // History state (using React state instead of refs for proper re-rendering)
   const [history, setHistory] = useState<ImageData[]>([])
@@ -221,23 +223,8 @@ export default function UnifiedPaintingCanvas() {
 
     const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     
+    // Update history first
     setHistory(currentHistory => {
-      setHistoryIndex(currentIndex => {
-        // Remove any history after current index
-        const newHistory = currentHistory.slice(0, currentIndex + 1)
-        
-        // Add new state
-        newHistory.push(imageData)
-        
-        // Limit history size
-        if (newHistory.length > 20) {
-          newHistory.shift()
-          return newHistory.length - 1
-        }
-        
-        return newHistory.length - 1
-      })
-      
       // Remove any history after current index
       const newHistory = currentHistory.slice(0, historyIndex + 1)
       
@@ -250,6 +237,12 @@ export default function UnifiedPaintingCanvas() {
       }
       
       return newHistory
+    })
+    
+    // Then update index
+    setHistoryIndex(currentIndex => {
+      const newIndex = currentIndex + 1
+      return newIndex > 19 ? 19 : newIndex
     })
   }, [historyIndex])
 
@@ -329,7 +322,7 @@ export default function UnifiedPaintingCanvas() {
     // Delay initialization to ensure canvas is ready
     const timer = setTimeout(initializePattern, 100)
     return () => clearTimeout(timer)
-  }, [createMaskPattern])
+  }, [])
 
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number) => {
@@ -343,14 +336,17 @@ export default function UnifiedPaintingCanvas() {
     return { x: Math.round(x), y: Math.round(y) }
   }, [])
 
-  // Drawing functions
-  const drawOnCanvas = useCallback((x: number, y: number, canvas: HTMLCanvasElement, isErasing = false) => {
-    const ctx = canvas.getContext('2d')
+  // Draw smooth stroke directly to main canvas with immediate feedback
+  const drawStrokeSegment = useCallback((fromPoint: { x: number; y: number }, toPoint: { x: number; y: number }) => {
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (!paintingCanvas) return
+
+    const ctx = paintingCanvas.getContext('2d')
     if (!ctx) return
 
-    ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over'
+    // Set up drawing style
+    ctx.globalCompositeOperation = toolState.activeTool === 'eraser' ? 'destination-out' : 'source-over'
     
-    // Use pattern for mask tool, solid color for other tools
     if (toolState.activeTool === 'mask' && maskPatternRef.current) {
       ctx.fillStyle = maskPatternRef.current
       ctx.strokeStyle = maskPatternRef.current
@@ -365,28 +361,108 @@ export default function UnifiedPaintingCanvas() {
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
 
+    // Draw line segment
     ctx.beginPath()
-    ctx.arc(x, y, toolState.brushSize / 2, 0, Math.PI * 2)
+    ctx.moveTo(fromPoint.x, fromPoint.y)
+    ctx.lineTo(toPoint.x, toPoint.y)
+    ctx.stroke()
+  }, [toolState])
+
+  // Draw a single point (for initial click)
+  const drawPoint = useCallback((point: { x: number; y: number }) => {
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (!paintingCanvas) return
+
+    const ctx = paintingCanvas.getContext('2d')
+    if (!ctx) return
+
+    // Set up drawing style
+    ctx.globalCompositeOperation = toolState.activeTool === 'eraser' ? 'destination-out' : 'source-over'
+    
+    if (toolState.activeTool === 'mask' && maskPatternRef.current) {
+      ctx.fillStyle = maskPatternRef.current
+      ctx.globalAlpha = 1 // Pattern already has transparency
+    } else {
+      ctx.fillStyle = toolState.brushColor
+      ctx.globalAlpha = toolState.brushOpacity
+    }
+
+    // Draw a circle for the point
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, toolState.brushSize / 2, 0, Math.PI * 2)
     ctx.fill()
   }, [toolState])
 
-  const drawLine = useCallback((x1: number, y1: number, x2: number, y2: number) => {
-    const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-    const steps = Math.max(1, Math.ceil(distance / 2)) // Smaller steps for smoother pattern
+  // Redraw entire stroke smoothly (for smooth curves)
+  const redrawCompleteStroke = useCallback((points: { x: number; y: number }[]) => {
+    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+    if (!paintingCanvas || points.length === 0) return
 
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps
-      const x = x1 + (x2 - x1) * t
-      const y = y1 + (y2 - y1) * t
-      
-      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
-      if (paintingCanvas) {
-        drawOnCanvas(x, y, paintingCanvas, toolState.activeTool === 'eraser')
-      }
+    const ctx = paintingCanvas.getContext('2d')
+    if (!ctx) return
+
+    // Restore canvas to state before stroke started
+    if (strokeStartImageDataRef.current) {
+      ctx.putImageData(strokeStartImageDataRef.current, 0, 0)
     }
-  }, [toolState.activeTool, drawOnCanvas])
 
-  // Event handlers for canvas drawing
+    // Set up drawing style
+    ctx.globalCompositeOperation = toolState.activeTool === 'eraser' ? 'destination-out' : 'source-over'
+    
+    if (toolState.activeTool === 'mask' && maskPatternRef.current) {
+      ctx.fillStyle = maskPatternRef.current
+      ctx.strokeStyle = maskPatternRef.current
+      ctx.globalAlpha = 1 // Pattern already has transparency
+    } else {
+      ctx.fillStyle = toolState.brushColor
+      ctx.strokeStyle = toolState.brushColor
+      ctx.globalAlpha = toolState.brushOpacity
+    }
+    
+    ctx.lineWidth = toolState.brushSize
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    if (points.length === 1) {
+      // Single point - draw a circle
+      const point = points[0]
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, toolState.brushSize / 2, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      // Multiple points - draw as a smooth stroke
+      ctx.beginPath()
+      ctx.moveTo(points[0].x, points[0].y)
+      
+      // Use quadratic curves for smooth lines
+      for (let i = 1; i < points.length; i++) {
+        const currentPoint = points[i]
+        const previousPoint = points[i - 1]
+        
+        // Calculate control point for smooth curve
+        const controlX = (previousPoint.x + currentPoint.x) / 2
+        const controlY = (previousPoint.y + currentPoint.y) / 2
+        
+        if (i === 1) {
+          // First segment - line to control point
+          ctx.lineTo(controlX, controlY)
+        } else {
+          // Subsequent segments - quadratic curve
+          ctx.quadraticCurveTo(previousPoint.x, previousPoint.y, controlX, controlY)
+        }
+      }
+      
+      // Final line to last point
+      if (points.length > 1) {
+        const lastPoint = points[points.length - 1]
+        ctx.lineTo(lastPoint.x, lastPoint.y)
+      }
+      
+      ctx.stroke()
+    }
+  }, [toolState])
+
+  // Event handlers for canvas drawing with immediate feedback
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (toolState.activeTool === 'upload') return
 
@@ -402,29 +478,60 @@ export default function UnifiedPaintingCanvas() {
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     lastPointRef.current = { x, y }
 
+    // Save canvas state before starting stroke for smooth redrawing
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
     if (paintingCanvas) {
-      drawOnCanvas(x, y, paintingCanvas, toolState.activeTool === 'eraser')
+      const ctx = paintingCanvas.getContext('2d')
+      if (ctx) {
+        strokeStartImageDataRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      }
     }
-  }, [toolState, screenToCanvas, drawOnCanvas, isColorPickerActive])
+
+    // Start new stroke - add first point
+    strokePointsRef.current = [{ x, y }]
+    
+    // Draw initial point immediately
+    drawPoint({ x, y })
+  }, [toolState, screenToCanvas, drawPoint, isColorPickerActive])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || !lastPointRef.current) return
 
     e.preventDefault()
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
-    drawLine(lastPointRef.current.x, lastPointRef.current.y, x, y)
+    
+    // Add point to current stroke
+    strokePointsRef.current.push({ x, y })
+    
+    // For performance, use simple line drawing for immediate feedback
+    // but redraw complete smooth stroke every few points
+    if (strokePointsRef.current.length % 3 === 0) {
+      // Every 3rd point, redraw the complete smooth stroke
+      redrawCompleteStroke(strokePointsRef.current)
+    } else {
+      // Otherwise, just draw a line segment for immediate feedback
+      drawStrokeSegment(lastPointRef.current, { x, y })
+    }
+    
     lastPointRef.current = { x, y }
-  }, [isDrawing, screenToCanvas, drawLine])
+  }, [isDrawing, screenToCanvas, drawStrokeSegment, redrawCompleteStroke])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
     if (isDrawing) {
+      // Final smooth redraw of complete stroke
+      redrawCompleteStroke(strokePointsRef.current)
+      
+      // Save to history
       saveToHistory()
+      
+      // Clear stroke data
+      strokePointsRef.current = []
+      strokeStartImageDataRef.current = null
     }
     setIsDrawing(false)
     lastPointRef.current = null
-  }, [isDrawing, saveToHistory])
+  }, [isDrawing, redrawCompleteStroke, saveToHistory])
 
   // File upload handler
   const handleFileUpload = useCallback(async (file: File) => {
@@ -738,98 +845,89 @@ export default function UnifiedPaintingCanvas() {
           URL.revokeObjectURL(url)
         }
       }, 'image/png')
-
-      // Clean up
-      exportCanvas.remove()
-
     } catch (err: any) {
-      console.error('PNG export error:', err)
-      setError(err?.message || 'Failed to export as PNG')
+      console.error('Export error:', err)
+      setError(err?.message || 'Failed to export canvas')
     }
   }, [editorState.backgroundImage])
-
-  const handleExportJPG = useCallback((quality: number = 85) => {
-    try {
-      setError(null)
-
-      // Create a temporary canvas to combine layers
-      const exportCanvas = document.createElement('canvas')
-      const exportCtx = exportCanvas.getContext('2d')
-      
-      if (!exportCtx) {
-        throw new Error('Could not create export canvas')
-      }
-
-      // Set canvas dimensions
-      exportCanvas.width = CANVAS_WIDTH
-      exportCanvas.height = CANVAS_HEIGHT
-
-      // Fill with white background for JPG (JPG doesn't support transparency)
-      exportCtx.fillStyle = '#ffffff'
-      exportCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-
-      // Draw background image if present
-      if (editorState.backgroundImage) {
-        const backgroundCanvas = canvasRef.current?.getBackgroundCanvas()
-        if (backgroundCanvas) {
-          exportCtx.drawImage(backgroundCanvas, 0, 0)
-        }
-      }
-
-      // Draw painting layer on top
-      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
-      if (paintingCanvas) {
-        exportCtx.drawImage(paintingCanvas, 0, 0)
-      }
-
-      // Generate filename with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `canvas-export-${timestamp}.jpg`
-
-      // Convert to blob and download
-      exportCanvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          URL.revokeObjectURL(url)
-        }
-      }, 'image/jpeg', quality / 100)
-
-      // Clean up
-      exportCanvas.remove()
-
-    } catch (err: any) {
-      console.error('JPG export error:', err)
-      setError(err?.message || 'Failed to export as JPG')
-    }
-  }, [editorState.backgroundImage])
-
-  // Add event listeners to the painting canvas for drawing
-  useEffect(() => {
-    const paintingCanvas = canvasRef.current?.getPaintingCanvas()
-    if (!paintingCanvas) return
-
-    paintingCanvas.addEventListener('pointerdown', handlePointerDown as any)
-    paintingCanvas.addEventListener('pointermove', handlePointerMove as any)
-    paintingCanvas.addEventListener('pointerup', handlePointerUp as any)
-    paintingCanvas.addEventListener('pointerleave', handlePointerUp as any)
-
-    return () => {
-      paintingCanvas.removeEventListener('pointerdown', handlePointerDown as any)
-      paintingCanvas.removeEventListener('pointermove', handlePointerMove as any)
-      paintingCanvas.removeEventListener('pointerup', handlePointerUp as any)
-      paintingCanvas.removeEventListener('pointerleave', handlePointerUp as any)
-    }
-  }, [handlePointerDown, handlePointerMove, handlePointerUp])
 
   return (
-    <div>
-      {/* Hidden file input for upload functionality */}
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">Unified Painting Canvas</h1>
+          <div className="flex items-center gap-4">
+            {editorState.backgroundImage && (
+              <button
+                onClick={() => setShowAIModal(true)}
+                disabled={isAIGenerating}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAIGenerating ? 'Generating...' : 'AI Edit'}
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {error && (
+          <div className="mt-2 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Canvas area */}
+        <div className="flex-1 relative">
+          {/* Drag overlay */}
+          {isDragActive && (
+            <div className="absolute inset-0 bg-blue-500 bg-opacity-20 border-2 border-dashed border-blue-500 z-50 flex items-center justify-center">
+              <div className="text-blue-700 text-xl font-semibold">
+                Drop image here to upload
+              </div>
+            </div>
+          )}
+
+          {/* Canvas container */}
+          <div className="w-full h-full flex items-center justify-center p-4">
+            <div className="relative">
+              <EdgeToEdgeCanvas
+                ref={canvasRef}
+                backgroundImage={editorState.backgroundImage}
+                onCanvasStateChange={(state) => setCanvasState(state)}
+                isDragActive={isDragActive}
+                isUploading={isUploading}
+                showMask={showMask}
+                activeTool={toolState.activeTool}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tool panel */}
+        <div className="flex-shrink-0">
+          <FloatingToolPanel
+            toolState={toolState}
+            onToolStateChange={(updates) => setToolState(prev => ({ ...prev, ...updates }))}
+            onClear={clearCanvas}
+            onUndo={undo}
+            onRedo={redo}
+            onExportPNG={handleExportPNG}
+            onUploadClick={handleUploadClick}
+            onToggleMask={() => setShowMask(!showMask)}
+            showMask={showMask}
+            canUndo={historyIndex > 0}
+            canRedo={historyIndex < history.length - 1}
+          />
+        </div>
+      </div>
+
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -837,57 +935,18 @@ export default function UnifiedPaintingCanvas() {
         onChange={handleFileInputChange}
         className="hidden"
       />
-      
-      {/* Error display */}
-      {error && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 p-4 text-red-700 bg-red-100 border border-red-300 rounded-lg shadow-lg max-w-md">
-          <p>{error}</p>
-          <button 
-            onClick={() => setError(null)}
-            className="mt-2 text-sm font-medium text-red-700 hover:text-red-900"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Floating Tool Panel */}
-      <FloatingToolPanel
-        toolState={toolState}
-        onToolStateChange={handleToolStateChange}
-        onUploadClick={handleUploadClick}
-        onUndo={undo}
-        onRedo={redo}
-        onClear={clearCanvas}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        showMask={showMask}
-        onToggleMask={handleToggleMask}
-        onAIGenerate={handleAIGenerate}
-        onExportPNG={handleExportPNG}
-        onExportJPG={handleExportJPG}
-      />
-
-      {/* Edge-to-Edge Canvas */}
-      <EdgeToEdgeCanvas
-        ref={canvasRef}
-        backgroundImage={editorState.backgroundImage}
-        onCanvasStateChange={handleCanvasStateChange}
-        isDragActive={isDragActive}
-        isUploading={isUploading}
-        showMask={showMask}
-        activeTool={toolState.activeTool}
-      />
 
       {/* AI Prompt Modal */}
-      <AIPromptModal
-        isOpen={showAIModal}
-        onClose={handleAIModalClose}
-        onSubmit={handleAIPromptSubmit}
-        onApplyToCanvas={handleApplyToCanvas}
-        isLoading={isAIGenerating}
-        result={aiResult}
-      />
+      {showAIModal && (
+        <AIPromptModal
+          isOpen={showAIModal}
+          onClose={handleAIModalClose}
+          onSubmit={handleAIPromptSubmit}
+          isLoading={isAIGenerating}
+          result={aiResult}
+          onApplyToCanvas={handleApplyToCanvas}
+        />
+      )}
     </div>
   )
 }

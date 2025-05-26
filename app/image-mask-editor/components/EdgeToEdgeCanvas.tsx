@@ -25,6 +25,9 @@ interface EdgeToEdgeCanvasProps {
   isUploading: boolean;
   showMask?: boolean;
   activeTool?: string;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerMove?: (e: React.PointerEvent) => void;
+  onPointerUp?: (e: React.PointerEvent) => void;
 }
 
 export interface EdgeToEdgeCanvasRef {
@@ -42,7 +45,10 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
   isDragActive,
   isUploading,
   showMask = false,
-  activeTool = 'brush'
+  activeTool = 'brush',
+  onPointerDown,
+  onPointerMove,
+  onPointerUp
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -218,6 +224,9 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
           opacity: (activeTool === 'mask' && !showMask) ? 0 : 1,
           transition: 'opacity 0.2s ease-in-out'
         }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
       />
 
       {/* Instructions when no image */}

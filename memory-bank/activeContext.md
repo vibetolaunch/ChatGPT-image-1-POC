@@ -1,7 +1,7 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by problematic useEffect dependency arrays and nested state updates.
 
 ## Recent Focus Areas
 
@@ -163,7 +163,26 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 - **UX Impact**: Users can now expand toolbar anywhere on screen without losing access to controls
 
-### 9. **Previous Fixes Maintained**
+### 9. **Infinite Re-render Loop Fix (COMPLETED - 2025-05-26)**
+- **Issue**: "Maximum update depth exceeded" error causing application crash
+- **Root Causes**:
+  - `useEffect` for mask pattern initialization had `[createMaskPattern]` dependency, but `createMaskPattern` was recreated on every render
+  - `saveToHistory` function had nested `setState` calls that could cause race conditions
+  - Problematic dependency arrays causing infinite re-render cycles
+- **Solution**:
+  - **Fixed useEffect dependency**: Changed mask pattern initialization from `[createMaskPattern]` to `[]` to run only once
+  - **Simplified saveToHistory**: Removed nested state updates and separated history and index updates
+  - **Eliminated infinite loops**: Fixed all problematic dependency arrays causing re-render cycles
+- **Implementation Details**:
+  - Changed `useEffect(() => { initializePattern() }, [createMaskPattern])` to `useEffect(() => { initializePattern() }, [])`
+  - Refactored `saveToHistory` to update history first, then index separately to avoid race conditions
+  - Removed duplicate logic in history management that was causing nested state updates
+  - Fixed component prop interfaces to match actual component implementations
+- **Files Modified**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Application now renders without crashing, eliminated infinite re-render loops, stable component lifecycle
+
+### 10. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
@@ -256,6 +275,15 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Canvas Management**: Clear painting canvas after applying edits
 - **History Integration**: Save state changes for undo functionality
 - **Error Handling**: Graceful handling of image loading failures
+
+### Infinite Re-render Loop Prevention
+- **useEffect Dependencies**: Be extremely careful with dependency arrays - functions in dependencies cause re-renders
+- **useCallback Dependencies**: Functions without dependencies get recreated on every render, causing infinite loops
+- **Nested State Updates**: Avoid calling setState inside setState callbacks - causes race conditions
+- **Component Lifecycle**: Understand when components re-render and what triggers useEffect
+- **Debugging Approach**: Look for "Maximum update depth exceeded" errors as signs of infinite loops
+- **Dependency Analysis**: Functions in useEffect dependencies must be stable or memoized properly
+- **State Update Patterns**: Separate state updates when they depend on each other to avoid conflicts
 
 ### Floating UI Implementation
 - **Drag Handling**: Use pointer events with proper offset calculations

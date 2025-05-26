@@ -52,6 +52,26 @@
 
 ## ✅ Recently Completed
 
+### Infinite Re-render Loop Fix (COMPLETED - 2025-05-26)
+- **Issue**: "Maximum update depth exceeded" error causing application crash and preventing usage
+- **Root Causes**:
+  - `useEffect` for mask pattern initialization had `[createMaskPattern]` dependency, but `createMaskPattern` was recreated on every render
+  - `saveToHistory` function had nested `setState` calls causing race conditions
+  - Problematic dependency arrays creating infinite re-render cycles
+- **Solution**:
+  - Fixed useEffect dependency array from `[createMaskPattern]` to `[]` for mask pattern initialization
+  - Simplified `saveToHistory` function to separate history and index updates, avoiding nested state calls
+  - Eliminated all problematic dependency arrays causing re-render loops
+  - Fixed component prop interfaces to match actual implementations
+- **Implementation Details**:
+  - Changed mask pattern useEffect to run only once on component mount
+  - Refactored history management to update history first, then index separately
+  - Removed duplicate logic that was causing nested state updates
+  - Fixed TypeScript prop interface mismatches between components
+- **Files Modified**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Application now renders without crashing, stable component lifecycle, eliminated infinite loops
+
 ### Color Picker UI Fix (COMPLETED - 2025-05-25)
 - **Issue**: Color picker button displayed a grey border inside the color swatch that couldn't be removed with CSS
 - **Root Cause**: Browser default styling for `<input type="color">` elements that overrides CSS attempts to remove borders
@@ -310,6 +330,13 @@
 - **Provider Accounts**: Active accounts with all AI services
 
 ## 🔄 Recent Changes Log
+
+### 2025-05-26: Infinite Re-render Loop Fix
+- **Problem**: "Maximum update depth exceeded" error causing application crash
+- **Solution**: Fixed problematic useEffect dependency arrays and nested state updates
+- **Files**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (fixed useEffect dependencies and saveToHistory function)
+- **Impact**: Application now renders without crashing, eliminated infinite re-render loops
 
 ### 2025-05-25: Export Tool Implementation
 - **Feature**: Complete export functionality for saving canvas artwork

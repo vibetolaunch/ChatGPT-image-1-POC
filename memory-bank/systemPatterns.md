@@ -219,3 +219,48 @@ export async function POST(request: Request) {
 - **Provider Selection**: Choose optimal provider for request
 - **Caching**: Result caching where appropriate
 - **Rate Limiting**: Respect provider limits
+
+## React Performance Patterns
+
+### useEffect Dependency Management
+**Critical Pattern**: Avoid infinite re-render loops
+
+**Problem**: Functions in useEffect dependency arrays cause re-renders
+```typescript
+// ❌ WRONG - causes infinite loop
+const createPattern = useCallback(() => { /* logic */ }, [])
+useEffect(() => {
+  initializePattern()
+}, [createPattern]) // createPattern recreated every render
+
+// ✅ CORRECT - stable dependencies
+useEffect(() => {
+  const initializePattern = () => { /* logic */ }
+  initializePattern()
+}, []) // Empty dependency array for one-time initialization
+```
+
+### State Update Patterns
+**Critical Pattern**: Avoid nested setState calls
+
+**Problem**: Nested state updates cause race conditions
+```typescript
+// ❌ WRONG - nested state updates
+setHistory(currentHistory => {
+  setHistoryIndex(currentIndex => {
+    // Nested setState calls cause issues
+    return newIndex
+  })
+  return newHistory
+})
+
+// ✅ CORRECT - separate state updates
+setHistory(currentHistory => newHistory)
+setHistoryIndex(currentIndex => newIndex)
+```
+
+### Component Re-render Prevention
+- **Dependency Arrays**: Only include values that should trigger re-runs
+- **useCallback**: Memoize functions only when dependencies actually change
+- **State Management**: Use React state for UI-affecting values, refs for non-UI values
+- **Error Detection**: "Maximum update depth exceeded" indicates infinite loops
