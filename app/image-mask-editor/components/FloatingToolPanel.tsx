@@ -48,7 +48,6 @@ export default function FloatingToolPanel({
   const [position, setPosition] = useState<Position>({ x: 20, y: 20 })
   const [isDragging, setIsDragging] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [showColorPicker, setShowColorPicker] = useState(false)
   const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 })
   
   const panelRef = useRef<HTMLDivElement>(null)
@@ -239,27 +238,18 @@ export default function FloatingToolPanel({
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-600 w-12">Color</span>
               <div className="relative">
-                <button
-                  onClick={() => setShowColorPicker(!showColorPicker)}
-                  className="w-6 h-6 rounded border-2 border-gray-300 shadow-sm"
+                <input
+                  type="color"
+                  value={toolState.brushColor}
+                  onChange={(e) => onToolStateChange({ brushColor: e.target.value })}
+                  className="absolute opacity-0 w-6 h-6 cursor-pointer"
+                  id="color-picker"
+                />
+                <label
+                  htmlFor="color-picker"
+                  className="block w-6 h-6 rounded shadow-sm cursor-pointer"
                   style={{ backgroundColor: toolState.brushColor }}
                 />
-                {showColorPicker && (
-                  <div className="absolute top-8 left-0 z-60 bg-white border border-gray-300 rounded-lg p-2 shadow-lg">
-                    <input
-                      type="color"
-                      value={toolState.brushColor}
-                      onChange={(e) => onToolStateChange({ brushColor: e.target.value })}
-                      className="w-full h-6 rounded"
-                    />
-                    <button
-                      onClick={() => setShowColorPicker(false)}
-                      className="mt-1 px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 w-full"
-                    >
-                      Close
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
