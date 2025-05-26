@@ -41,6 +41,14 @@ interface EditorState {
 const CANVAS_WIDTH = 800
 const CANVAS_HEIGHT = 600
 
+// Mask pattern configuration
+const MASK_PATTERN_CONFIG = {
+  stripeWidth: 12, // Width of each stripe (thick stripes)
+  stripeColor: 'rgba(138, 43, 226, 0.3)', // Electric purple, 30% transparent (more transparent)
+  stripeAngle: 45, // Diagonal angle in degrees
+  patternSize: 48 // Larger pattern size for better alignment
+}
+
 export default function UnifiedPaintingCanvas() {
   // Main state
   const [editorState, setEditorState] = useState<EditorState>({
@@ -81,6 +89,7 @@ export default function UnifiedPaintingCanvas() {
   // Canvas refs
   const canvasRef = useRef<EdgeToEdgeCanvasRef>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const maskPatternRef = useRef<CanvasPattern | null>(null)
   
   // Drawing state refs
   const lastPointRef = useRef<{ x: number; y: number } | null>(null)
@@ -269,6 +278,59 @@ export default function UnifiedPaintingCanvas() {
     }
   }, [historyIndex, history])
 
+  // Create diagonal stripe pattern for mask tool
+  const createMaskPattern = useCallback(() => {
+    const patternCanvas = document.createElement('canvas')
+    const patternCtx = patternCanvas.getContext('2d')
+    if (!patternCtx) return null
+
+    // Set pattern canvas size
+    patternCanvas.width = MASK_PATTERN_CONFIG.patternSize
+    patternCanvas.height = MASK_PATTERN_CONFIG.patternSize
+
+    // Clear canvas (transparent background)
+    patternCtx.clearRect(0, 0, patternCanvas.width, patternCanvas.height)
+
+    // Draw diagonal stripes
+    patternCtx.strokeStyle = MASK_PATTERN_CONFIG.stripeColor
+    patternCtx.lineWidth = MASK_PATTERN_CONFIG.stripeWidth
+    patternCtx.lineCap = 'square'
+
+    // Calculate stripe spacing (double the stripe width for equal stripe/gap ratio)
+    const stripeSpacing = MASK_PATTERN_CONFIG.stripeWidth * 2
+
+    // Draw multiple diagonal lines to fill the pattern
+    for (let i = -patternCanvas.width; i < patternCanvas.width * 2; i += stripeSpacing) {
+      patternCtx.beginPath()
+      patternCtx.moveTo(i, 0)
+      patternCtx.lineTo(i + patternCanvas.height, patternCanvas.height)
+      patternCtx.stroke()
+    }
+
+    return patternCanvas
+  }, [])
+
+  // Initialize mask pattern when canvas is ready
+  useEffect(() => {
+    const initializePattern = () => {
+      const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+      if (!paintingCanvas) return
+
+      const ctx = paintingCanvas.getContext('2d')
+      if (!ctx) return
+
+      const patternCanvas = createMaskPattern()
+      if (patternCanvas) {
+        const pattern = ctx.createPattern(patternCanvas, 'repeat')
+        maskPatternRef.current = pattern
+      }
+    }
+
+    // Delay initialization to ensure canvas is ready
+    const timer = setTimeout(initializePattern, 100)
+    return () => clearTimeout(timer)
+  }, [createMaskPattern])
+
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number) => {
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
@@ -287,9 +349,18 @@ export default function UnifiedPaintingCanvas() {
     if (!ctx) return
 
     ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over'
-    ctx.globalAlpha = toolState.brushOpacity
-    ctx.fillStyle = toolState.brushColor
-    ctx.strokeStyle = toolState.brushColor
+    
+    // Use pattern for mask tool, solid color for other tools
+    if (toolState.activeTool === 'mask' && maskPatternRef.current) {
+      ctx.fillStyle = maskPatternRef.current
+      ctx.strokeStyle = maskPatternRef.current
+      ctx.globalAlpha = 1 // Pattern already has transparency
+    } else {
+      ctx.fillStyle = toolState.brushColor
+      ctx.strokeStyle = toolState.brushColor
+      ctx.globalAlpha = toolState.brushOpacity
+    }
+    
     ctx.lineWidth = toolState.brushSize
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -301,7 +372,7 @@ export default function UnifiedPaintingCanvas() {
 
   const drawLine = useCallback((x1: number, y1: number, x2: number, y2: number) => {
     const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-    const steps = Math.max(1, Math.ceil(distance))
+    const steps = Math.max(1, Math.ceil(distance / 2)) // Smaller steps for smoother pattern
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps
