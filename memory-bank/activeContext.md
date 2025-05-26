@@ -1,11 +1,27 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state.
 
 ## Recent Focus Areas
 
-### 1. **Canvas Resize Content Preservation Fix (COMPLETED - 2025-05-25)**
+### 1. **Undo/Redo Functionality Fix (COMPLETED - 2025-05-25)**
+- **Issue**: The redo button was not clickable even after performing undo operations
+- **Root Cause**: History management was using React refs (`historyRef`, `historyIndexRef`) instead of state, preventing the FloatingToolPanel from re-rendering when history changed
+- **Solution**: 
+  - Converted history management from refs to React state (`history`, `historyIndex`)
+  - Updated all history-related functions to use state setters
+  - Fixed FloatingToolPanel props to use state values for button enable/disable logic
+- **Implementation Details**:
+  - Changed `historyRef.current` and `historyIndexRef.current` to `history` and `historyIndex` state variables
+  - Updated `saveToHistory` function to use proper state setters with functional updates
+  - Modified `undo` and `redo` functions to use state variables and update them with `setHistoryIndex`
+  - Fixed FloatingToolPanel props: `canUndo={historyIndex > 0}` and `canRedo={historyIndex < history.length - 1}`
+- **Files Modified**: 
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
+- **Impact**: Undo/redo buttons now properly enable/disable based on history state, redo button is clickable after undo operations
+
+### 2. **Canvas Resize Content Preservation Fix (COMPLETED - 2025-05-25)**
 - **Issue**: When resizing the browser window, all canvas content (uploaded images and brush strokes/masks) was being wiped
 - **Root Cause**: The `setupCanvas` function in `EdgeToEdgeCanvas` was clearing both canvases during resize operations without preserving existing content
 - **Solution**: 
@@ -22,7 +38,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
 - **Impact**: Users can now resize browser window without losing any work - both uploaded images and painted content are fully preserved while canvas properly scales and repositions
 
-### 2. **Apply to Canvas Fix (COMPLETED - 2025-05-25)**
+### 3. **Apply to Canvas Fix (COMPLETED - 2025-05-25)**
 - **Issue**: "Apply to Canvas" button in AI modal had TODO comment and wasn't functional
 - **Root Cause**: Button only closed modal without applying the AI-generated result
 - **Solution**: 
@@ -39,7 +55,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 - **Impact**: Users can now seamlessly apply AI edits to canvas and continue editing
 
-### 3. **Floating Toolbar Redesign (COMPLETED)**
+### 4. **Floating Toolbar Redesign (COMPLETED)**
 - **Implementation**: Created `FloatingToolPanel.tsx` component with modern glassmorphism design
 - **Key Features**:
   - Draggable positioning anywhere on screen
@@ -54,7 +70,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Compact design maximizes canvas real estate
 - **Files Created**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 
-### 4. **Edge-to-Edge Canvas Layout (COMPLETED)**
+### 5. **Edge-to-Edge Canvas Layout (COMPLETED)**
 - **Implementation**: Created `EdgeToEdgeCanvas.tsx` for full-viewport canvas experience
 - **Key Features**:
   - Canvas extends from edge to edge of screen (no borders/frames)
@@ -70,7 +86,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Maximum canvas space utilization
 - **Files Created**: `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`
 
-### 5. **Unified Canvas Refactor (COMPLETED)**
+### 6. **Unified Canvas Refactor (COMPLETED)**
 - **Major Refactor**: Completely rewrote `UnifiedPaintingCanvas.tsx` to integrate new components
 - **Architecture Changes**:
   - Replaced fixed toolbar with floating panel system
@@ -85,7 +101,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - Enhanced error handling
 - **Files Modified**: `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 
-### 6. **Drag Performance Optimization (COMPLETED - 2025-05-25)**
+### 7. **Drag Performance Optimization (COMPLETED - 2025-05-25)**
 - **Issue**: Floating toolbar dragging was laggy and not performant
 - **Root Causes**:
   - Excessive re-renders during drag operations
@@ -107,7 +123,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 - **Performance Impact**: Eliminated lag during dragging, smooth 60fps movement
 
-### 7. **Auto-Repositioning Feature (COMPLETED - 2025-05-25)**
+### 8. **Auto-Repositioning Feature (COMPLETED - 2025-05-25)**
 - **Issue**: When expanding the floating toolbar, parts could extend off-screen making content inaccessible
 - **User Experience Problem**: Users would lose access to toolbar controls if panel expanded beyond viewport bounds
 - **Solution**: 
@@ -130,7 +146,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Files Modified**: `app/image-mask-editor/components/FloatingToolPanel.tsx`
 - **UX Impact**: Users can now expand toolbar anywhere on screen without losing access to controls
 
-### 8. **Previous Fixes Maintained**
+### 9. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
@@ -146,15 +162,17 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Minimal Distractions**: Tools available but not intrusive
 - **Seamless Workflow**: AI results integrate directly into editing workflow
 - **Content Preservation**: All user work preserved during interface changes
+- **Functional History**: Proper undo/redo state management for reliable workflow
 
 ### Technical Patterns (Enhanced)
 - **Component Separation**: Dedicated components for toolbar and canvas
 - **Ref-based Communication**: Canvas access through imperative handles
 - **Event Delegation**: Proper pointer event handling for drawing
 - **Responsive Design**: Viewport-aware scaling and positioning
-- **State Management**: Centralized tool state with callback patterns
+- **State Management**: Centralized tool state with callback patterns, proper React state for UI updates
 - **Callback Architecture**: Parent-child communication through props
 - **Content Preservation**: Canvas content preservation during resize operations
+- **History Management**: React state for undo/redo to ensure proper re-rendering
 
 ### Configuration Choices
 - **Canvas Dimensions**: 800x600 base with responsive scaling
@@ -199,6 +217,14 @@ The project is a functional AI image editing POC with mask-based editing capabil
 
 ## Important Patterns & Learnings
 
+### Undo/Redo State Management Implementation
+- **React State vs Refs**: Use React state for values that affect UI rendering (button enable/disable states)
+- **Functional State Updates**: Use functional updates when state depends on previous state to avoid stale closures
+- **Component Re-rendering**: State changes trigger re-renders, ensuring UI reflects current application state
+- **History Management**: Maintain history array and current index as separate state variables
+- **Button State Logic**: Calculate button enabled/disabled state directly from history state variables
+- **Canvas Restoration**: Use ImageData API to restore canvas content from history
+
 ### Canvas Content Preservation Implementation
 - **ImageData API**: Use `getImageData()` and `putImageData()` for pixel-perfect content preservation
 - **Dual Canvas Preservation**: Preserve both background (images) and painting (masks/brushes) canvases
@@ -232,7 +258,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 ### Component Design
 - **Separation of Concerns**: Distinct components for UI and canvas logic
 - **Props Interface**: Clean API boundaries between components
-- **State Management**: Centralized state with callback patterns
+- **State Management**: Centralized state with callback patterns, React state for UI updates
 - **TypeScript**: Strong typing for component interfaces
 - **Reusability**: Components designed for potential reuse
 
@@ -246,7 +272,7 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - `app/image-mask-editor/components/AIPromptModal.tsx`: AI modal with apply functionality (UPDATED)
 - `app/image-mask-editor/components/FloatingToolPanel.tsx`: New floating toolbar (CREATED)
 - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: New canvas layout with content preservation (UPDATED)
-- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface (REFACTORED)
+- `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Main interface with undo/redo fix (UPDATED)
 - `lib/providers/`: Provider implementations and factory
 - `app/api/mask-edit-image/route.ts`: Core API endpoint
 - `lib/config.ts`: Configuration and feature flags
@@ -261,6 +287,7 @@ The image editor now features a modern, professional interface with:
 - **Auto-docking** toolbar that snaps to screen edges
 - **Functional AI integration** with working "Apply to Canvas" feature
 - **Content preservation** during browser resize operations
+- **Fully functional undo/redo** with proper state management
 - **Preserved functionality** with all existing features intact
 
-This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate, with a complete AI editing workflow and robust content preservation.
+This redesign transforms the editor from a traditional fixed-layout interface to a modern, flexible workspace that adapts to user preferences and maximizes canvas real estate, with a complete AI editing workflow, robust content preservation, and reliable undo/redo functionality.
