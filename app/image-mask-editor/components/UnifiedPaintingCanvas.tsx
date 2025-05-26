@@ -79,8 +79,10 @@ export default function UnifiedPaintingCanvas() {
   
   // Drawing state refs
   const lastPointRef = useRef<{ x: number; y: number } | null>(null)
-  const historyRef = useRef<ImageData[]>([])
-  const historyIndexRef = useRef(-1)
+  
+  // History state (using React state instead of refs for proper re-rendering)
+  const [history, setHistory] = useState<ImageData[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
 
   // Initialize history when canvas is ready
   useEffect(() => {
@@ -92,8 +94,8 @@ export default function UnifiedPaintingCanvas() {
       if (ctx) {
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        historyRef.current = [imageData]
-        historyIndexRef.current = 0
+        setHistory([imageData])
+        setHistoryIndex(0)
       }
     }
 
@@ -112,42 +114,62 @@ export default function UnifiedPaintingCanvas() {
 
     const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     
-    // Remove any history after current index
-    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1)
-    
-    // Add new state
-    historyRef.current.push(imageData)
-    historyIndexRef.current = historyRef.current.length - 1
-    
-    // Limit history size
-    if (historyRef.current.length > 20) {
-      historyRef.current.shift()
-      historyIndexRef.current--
-    }
-  }, [])
+    setHistory(currentHistory => {
+      setHistoryIndex(currentIndex => {
+        // Remove any history after current index
+        const newHistory = currentHistory.slice(0, currentIndex + 1)
+        
+        // Add new state
+        newHistory.push(imageData)
+        
+        // Limit history size
+        if (newHistory.length > 20) {
+          newHistory.shift()
+          return newHistory.length - 1
+        }
+        
+        return newHistory.length - 1
+      })
+      
+      // Remove any history after current index
+      const newHistory = currentHistory.slice(0, historyIndex + 1)
+      
+      // Add new state
+      newHistory.push(imageData)
+      
+      // Limit history size
+      if (newHistory.length > 20) {
+        newHistory.shift()
+      }
+      
+      return newHistory
+    })
+  }, [historyIndex])
 
   // Undo/Redo functions
   const undo = useCallback(() => {
-    if (historyIndexRef.current > 0) {
-      historyIndexRef.current--
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
       const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
-      if (ctx && historyRef.current[historyIndexRef.current]) {
-        ctx.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
+      if (ctx && history[newIndex]) {
+        ctx.putImageData(history[newIndex], 0, 0)
       }
     }
-  }, [])
+  }, [historyIndex, history])
 
   const redo = useCallback(() => {
-    if (historyIndexRef.current < historyRef.current.length - 1) {
-      historyIndexRef.current++
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
       const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
-      if (ctx && historyRef.current[historyIndexRef.current]) {
-        ctx.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
+      if (ctx && history[newIndex]) {
+        ctx.putImageData(history[newIndex], 0, 0)
       }
     }
-  }, [])
+  }, [historyIndex, history])
 
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number) => {
@@ -661,8 +683,8 @@ export default function UnifiedPaintingCanvas() {
         onUndo={undo}
         onRedo={redo}
         onClear={clearCanvas}
-        canUndo={historyIndexRef.current > 0}
-        canRedo={historyIndexRef.current < historyRef.current.length - 1}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < history.length - 1}
         showMask={showMask}
         onToggleMask={handleToggleMask}
         onAIGenerate={handleAIGenerate}
