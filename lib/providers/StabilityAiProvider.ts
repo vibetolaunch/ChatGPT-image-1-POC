@@ -105,8 +105,23 @@ export class StabilityAiProvider implements ImageProvider {
         status: response.status,
         statusText: response.statusText,
         body: errorText,
+        url: apiEndpoint,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey?.substring(0, 10)}...`
+        }
       });
-      throw new Error(`Stability AI API error: ${response.status} ${response.statusText} - ${errorText}`);
+      
+      // Parse error response if it's JSON
+      let errorDetails = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetails = errorJson.message || errorJson.error || errorText;
+      } catch (e) {
+        // Keep original error text if not JSON
+      }
+      
+      throw new Error(`Stability AI API error: ${response.status} ${response.statusText} - ${errorDetails}`);
     }
 
     const resultJson: { artifacts: Array<{ base64: string; seed: number; finishReason: string }> } = await response.json();

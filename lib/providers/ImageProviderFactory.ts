@@ -1,6 +1,6 @@
 import { ImageProvider } from './types';
-import { RecraftProvider } from './RecraftProvider';
-import { StabilityAiProvider } from './StabilityAiProvider'; // Import StabilityAiProvider
+import { StabilityAiProvider } from './StabilityAiProvider';
+import { ReplicateProvider } from './ReplicateProvider';
 import { imageModels } from '@/lib/config';
 
 export class ImageProviderFactory {
@@ -8,13 +8,12 @@ export class ImageProviderFactory {
     // Use default model if none specified
     const selectedModel = modelName || imageModels.default;
     
-    if (selectedModel === 'recraft') {
-      return new RecraftProvider();
-    } else if (selectedModel === 'stabilityai') { // Add Stability AI case
+    if (selectedModel === 'stabilityai') {
       return new StabilityAiProvider();
+    } else if (selectedModel === 'replicate') {
+      return new ReplicateProvider();
     } else if (selectedModel === 'openai') {
-      // For now, we'll throw an error since we're focusing on Recraft
-      // This can be implemented later if needed
+      // OpenAI provider not yet implemented
       throw new Error('OpenAI provider not yet implemented in new architecture');
     } else {
       throw new Error(`Unknown model: ${selectedModel}`);

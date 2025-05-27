@@ -1,0 +1,154 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for iPaintAI
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide detailed information to help us understand your request.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following before submitting your feature request
+      options:
+        - label: I have searched existing issues to ensure this feature hasn't been requested already
+          required: true
+        - label: I have read the [Contributing Guidelines](../../CONTRIBUTING.md)
+          required: true
+        - label: This is a feature request, not a bug report or question
+          required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What need does it address?
+      placeholder: |
+        Describe the problem or limitation you're experiencing...
+        
+        Example: "As a user, I find it difficult to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see implemented
+      placeholder: |
+        Describe your proposed solution in detail...
+        
+        - How should it work?
+        - What should the user experience be like?
+        - Any specific implementation ideas?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-category
+    attributes:
+      label: Feature Category
+      description: Which area of the application would this feature affect?
+      options:
+        - AI Integration (OpenAI/ChatGPT-image-1)
+        - AI Integration (Stability AI)
+        - AI Integration (Recraft AI)
+        - AI Integration (New Provider)
+        - Canvas/Image Editing
+        - User Interface/UX
+        - Performance
+        - Authentication/Security
+        - File Management/Export
+        - Mobile/Responsive
+        - Accessibility
+        - Developer Experience
+        - Documentation
+        - Testing
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - High (Critical for my use case)
+        - Medium (Would be very helpful)
+        - Low (Nice to have)
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Describe specific scenarios where this feature would be useful
+      placeholder: |
+        Provide real-world examples of how this feature would be used:
+        
+        1. Scenario 1: When a user wants to...
+        2. Scenario 2: For developers who need to...
+        3. Scenario 3: In cases where...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What alternatives have you considered? Why isn't the current solution sufficient?
+      placeholder: |
+        - Alternative 1: I considered... but it doesn't work because...
+        - Alternative 2: Another option would be... however...
+        - Current workaround: Right now I have to... which is problematic because...
+
+  - type: textarea
+    id: mockups-examples
+    attributes:
+      label: Mockups/Examples
+      description: If applicable, add mockups, screenshots, or examples to illustrate your feature
+      placeholder: |
+        - Drag and drop images here
+        - Link to similar features in other applications
+        - Describe the visual design you envision
+
+  - type: dropdown
+    id: willing-to-contribute
+    attributes:
+      label: Contribution
+      description: Are you willing to help implement this feature?
+      options:
+        - "Yes, I can implement this feature"
+        - "Yes, I can help with design/planning"
+        - "Yes, I can help with testing"
+        - "Yes, I can help with documentation"
+        - "No, just suggesting the idea"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, links, or information about the feature request
+      placeholder: |
+        - Links to related discussions or issues
+        - References to similar features in other projects
+        - Research or articles that support this feature
+        - Community feedback you've received
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        **Note**: Feature requests are evaluated based on community interest, technical feasibility, and alignment with project goals.
+        
+        Thank you for helping improve iPaintAI! 🎨

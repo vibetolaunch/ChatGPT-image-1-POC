@@ -5,7 +5,7 @@ import { useState } from 'react'
 interface AIPromptModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (prompt: string) => void
+  onSubmit: (prompt: string, model?: string) => void
   onApplyToCanvas?: (resultUrl: string) => void
   isLoading?: boolean
   result?: string
@@ -20,13 +20,14 @@ export default function AIPromptModal({
   result
 }: AIPromptModalProps) {
   const [prompt, setPrompt] = useState('')
+  const [selectedModel, setSelectedModel] = useState('stabilityai')
 
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (prompt.trim() && !isLoading) {
-      onSubmit(prompt.trim())
+      onSubmit(prompt.trim(), selectedModel)
     }
   }
 
@@ -78,6 +79,31 @@ export default function AIPromptModal({
                   rows={3}
                   disabled={isLoading}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-2">
+                  AI Model
+                </label>
+                <select
+                  id="model"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isLoading}
+                >
+                  <option value="stabilityai">Stability AI (Recommended)</option>
+                  <option value="replicate">Replicate AI (SDXL)</option>
+                  <option value="openai">OpenAI GPT-Image-1 (Coming Soon)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {selectedModel === 'stabilityai'
+                    ? 'Industry-leading Stability AI models for professional results and excellent inpainting'
+                    : selectedModel === 'replicate'
+                    ? 'Stable Diffusion XL model via Replicate - powerful and versatile'
+                    : 'Advanced GPT-Image-1 model for creative image editing (temporarily unavailable)'
+                  }
+                </p>
               </div>
               
               <div className="flex gap-2">
