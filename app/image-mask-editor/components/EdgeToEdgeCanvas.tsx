@@ -28,6 +28,7 @@ interface EdgeToEdgeCanvasProps {
   onPointerDown?: (e: React.PointerEvent) => void;
   onPointerMove?: (e: React.PointerEvent) => void;
   onPointerUp?: (e: React.PointerEvent) => void;
+  onPointerLeave?: (e: React.PointerEvent) => void;
 }
 
 export interface EdgeToEdgeCanvasRef {
@@ -48,7 +49,8 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
   activeTool = 'brush',
   onPointerDown,
   onPointerMove,
-  onPointerUp
+  onPointerUp,
+  onPointerLeave
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -227,6 +229,7 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerLeave={onPointerLeave}
       />
 
       {/* Instructions when no image */}

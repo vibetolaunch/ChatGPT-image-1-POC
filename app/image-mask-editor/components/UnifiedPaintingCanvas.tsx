@@ -478,6 +478,10 @@ export default function UnifiedPaintingCanvas() {
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     lastPointRef.current = { x, y }
 
+    // Capture pointer to ensure we get all events even outside canvas
+    const target = e.currentTarget as HTMLElement
+    target.setPointerCapture(e.pointerId)
+
     // Save canvas state before starting stroke for smooth redrawing
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
     if (paintingCanvas) {
@@ -518,6 +522,13 @@ export default function UnifiedPaintingCanvas() {
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
+    
+    // Release pointer capture
+    const target = e.currentTarget as HTMLElement
+    if (target.hasPointerCapture && target.hasPointerCapture(e.pointerId)) {
+      target.releasePointerCapture(e.pointerId)
+    }
+    
     if (isDrawing) {
       // Final smooth redraw of complete stroke
       redrawCompleteStroke(strokePointsRef.current)
@@ -531,6 +542,75 @@ export default function UnifiedPaintingCanvas() {
     }
     setIsDrawing(false)
     lastPointRef.current = null
+  }, [isDrawing, redrawCompleteStroke, saveToHistory])
+
+  // Add pointer leave handler to stop drawing when leaving canvas
+  const handlePointerLeave = useCallback((e: React.PointerEvent) => {
+    // Don't stop drawing on pointer leave - let global handlers manage it
+    // This allows for smooth drawing that continues outside canvas bounds
+  }, [])
+
+  // Global event listeners to catch pointer events outside canvas
+  useEffect(() => {
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (isDrawing) {
+        console.log('Global pointer up detected - stopping drawing')
+        
+        // Final smooth redraw of complete stroke
+        if (strokePointsRef.current.length > 0) {
+          redrawCompleteStroke(strokePointsRef.current)
+          saveToHistory()
+        }
+        
+        // Clear stroke data
+        strokePointsRef.current = []
+        strokeStartImageDataRef.current = null
+        setIsDrawing(false)
+        lastPointRef.current = null
+      }
+    }
+
+    const handleGlobalPointerCancel = (e: PointerEvent) => {
+      if (isDrawing) {
+        console.log('Global pointer cancel detected - stopping drawing')
+        
+        // Don't save incomplete stroke on cancel
+        strokePointsRef.current = []
+        strokeStartImageDataRef.current = null
+        setIsDrawing(false)
+        lastPointRef.current = null
+      }
+    }
+
+    // Add global listeners
+    document.addEventListener('pointerup', handleGlobalPointerUp)
+    document.addEventListener('pointercancel', handleGlobalPointerCancel)
+    
+    // Also listen for visibility changes (tab switching, etc.)
+    const handleVisibilityChange = () => {
+      if (document.hidden && isDrawing) {
+        console.log('Page hidden while drawing - stopping drawing')
+        
+        // Save current stroke before stopping
+        if (strokePointsRef.current.length > 0) {
+          redrawCompleteStroke(strokePointsRef.current)
+          saveToHistory()
+        }
+        
+        strokePointsRef.current = []
+        strokeStartImageDataRef.current = null
+        setIsDrawing(false)
+        lastPointRef.current = null
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('pointerup', handleGlobalPointerUp)
+      document.removeEventListener('pointercancel', handleGlobalPointerCancel)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [isDrawing, redrawCompleteStroke, saveToHistory])
 
   // File upload handler
@@ -904,6 +984,7 @@ export default function UnifiedPaintingCanvas() {
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerLeave}
               />
             </div>
           </div>

@@ -1,7 +1,7 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by problematic useEffect dependency arrays and nested state updates.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by problematic useEffect dependency arrays and nested state updates. **Mouse Tracking Bug Fix Completed**: Fixed critical drawing bug where releasing mouse outside canvas would cause unwanted drawing when returning to canvas.
 
 ## Recent Focus Areas
 
@@ -182,7 +182,34 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
 - **Impact**: Application now renders without crashing, eliminated infinite re-render loops, stable component lifecycle
 
-### 10. **Previous Fixes Maintained**
+### 10. **Mouse Tracking Bug Fix (COMPLETED - 2025-05-26)**
+- **Issue**: Drawing would continue when user returned to canvas after releasing mouse button outside canvas bounds
+- **Root Cause**: Pointer events only attached to canvas element, so `onPointerUp` wouldn't fire when mouse released outside canvas
+- **User Experience Problem**: Users would accidentally draw unwanted lines when moving mouse back to canvas
+- **Solution**:
+  - **Global Event Listeners**: Added document-level `pointerup` and `pointercancel` listeners to catch mouse release anywhere
+  - **Pointer Capture API**: Used `setPointerCapture()` to ensure canvas receives all pointer events even outside bounds
+  - **Visibility Change Handler**: Added listener for tab switching and page hiding to stop drawing
+  - **Proper State Cleanup**: Ensured drawing state is reset in all edge cases
+- **Implementation Details**:
+  - Added `useEffect` with global event listeners for `pointerup`, `pointercancel`, and `visibilitychange`
+  - Modified `handlePointerDown` to call `setPointerCapture(e.pointerId)` on canvas element
+  - Modified `handlePointerUp` to call `releasePointerCapture(e.pointerId)` with safety check
+  - Added `handlePointerLeave` callback (currently minimal implementation)
+  - Updated `EdgeToEdgeCanvas` interface and props to support `onPointerLeave`
+  - Global handlers save stroke to history before stopping drawing for better UX
+- **Edge Cases Handled**:
+  - Mouse release outside browser window
+  - Tab switching while drawing
+  - Browser focus loss during drawing
+  - Page visibility changes
+  - Pointer cancellation events
+- **Files Modified**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Added global event listeners and pointer capture
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: Added onPointerLeave prop support
+- **Impact**: Drawing now behaves naturally - stops when mouse is released anywhere, no unwanted drawing when returning to canvas
+
+### 11. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
