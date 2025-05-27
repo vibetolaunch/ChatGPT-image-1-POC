@@ -1,7 +1,7 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by problematic useEffect dependency arrays and nested state updates. **Mouse Tracking Bug Fix Completed**: Fixed critical drawing bug where releasing mouse outside canvas would cause unwanted drawing when returning to canvas.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by circular dependencies in EdgeToEdgeCanvas component. **Mouse Tracking Bug Fix Completed**: Fixed critical drawing bug where releasing mouse outside canvas would cause unwanted drawing when returning to canvas.
 
 ## Recent Focus Areas
 
@@ -164,23 +164,26 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **UX Impact**: Users can now expand toolbar anywhere on screen without losing access to controls
 
 ### 9. **Infinite Re-render Loop Fix (COMPLETED - 2025-05-26)**
-- **Issue**: "Maximum update depth exceeded" error causing application crash
-- **Root Causes**:
-  - `useEffect` for mask pattern initialization had `[createMaskPattern]` dependency, but `createMaskPattern` was recreated on every render
-  - `saveToHistory` function had nested `setState` calls that could cause race conditions
-  - Problematic dependency arrays causing infinite re-render cycles
+- **Issue**: "Maximum update depth exceeded" error causing application crash and preventing usage
+- **Root Cause**: The `EdgeToEdgeCanvas` component had circular dependencies in its `setupCanvas` function:
+  - Recursive `setTimeout(setupCanvas, 100)` call creating infinite loops when canvas elements weren't ready
+  - `setupCanvas` function had `[onCanvasStateChange]` in dependency array, causing recreation on every render
+  - `useEffect` had `[setupCanvas]` as dependency, creating circular dependency chain
 - **Solution**:
-  - **Fixed useEffect dependency**: Changed mask pattern initialization from `[createMaskPattern]` to `[]` to run only once
-  - **Simplified saveToHistory**: Removed nested state updates and separated history and index updates
-  - **Eliminated infinite loops**: Fixed all problematic dependency arrays causing re-render cycles
+  - **Removed recursive setTimeout**: Eliminated `setTimeout(setupCanvas, 100)` that was causing infinite loops
+  - **Fixed circular dependencies**: Changed `setupCanvas` dependency array from `[onCanvasStateChange]` to `[]`
+  - **Implemented ref pattern**: Used `onCanvasStateChangeRef` to access latest callback without creating dependencies
+  - **Added ref update mechanism**: Added `useEffect` to keep ref updated when prop changes
 - **Implementation Details**:
-  - Changed `useEffect(() => { initializePattern() }, [createMaskPattern])` to `useEffect(() => { initializePattern() }, [])`
-  - Refactored `saveToHistory` to update history first, then index separately to avoid race conditions
-  - Removed duplicate logic in history management that was causing nested state updates
-  - Fixed component prop interfaces to match actual component implementations
+  - Removed problematic `setTimeout(setupCanvas, 100)` call from line 80
+  - Changed `setupCanvas` useCallback dependency from `[onCanvasStateChange]` to `[]`
+  - Added `onCanvasStateChangeRef` ref to store latest callback
+  - Added `useEffect` to update ref when `onCanvasStateChange` prop changes
+  - Updated function call from `onCanvasStateChange(newCanvasState)` to `onCanvasStateChangeRef.current(newCanvasState)`
 - **Files Modified**:
-  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
-- **Impact**: Application now renders without crashing, eliminated infinite re-render loops, stable component lifecycle
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx` (primary fix)
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (restored full functionality)
+- **Impact**: Application now loads without crashing, eliminated infinite loops, all canvas functionality works properly
 
 ### 10. **Mouse Tracking Bug Fix (COMPLETED - 2025-05-26)**
 - **Issue**: Drawing would continue when user returned to canvas after releasing mouse button outside canvas bounds
@@ -304,13 +307,14 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Error Handling**: Graceful handling of image loading failures
 
 ### Infinite Re-render Loop Prevention
-- **useEffect Dependencies**: Be extremely careful with dependency arrays - functions in dependencies cause re-renders
-- **useCallback Dependencies**: Functions without dependencies get recreated on every render, causing infinite loops
-- **Nested State Updates**: Avoid calling setState inside setState callbacks - causes race conditions
+- **Circular Dependencies**: Avoid circular dependencies between useCallback and useEffect hooks
+- **Recursive Function Calls**: Never use recursive setTimeout/setInterval calls in React components
+- **useCallback Dependencies**: Be extremely careful with dependency arrays - functions in dependencies cause re-renders
+- **Ref Pattern for Callbacks**: Use refs to access latest prop values without creating dependencies
 - **Component Lifecycle**: Understand when components re-render and what triggers useEffect
 - **Debugging Approach**: Look for "Maximum update depth exceeded" errors as signs of infinite loops
 - **Dependency Analysis**: Functions in useEffect dependencies must be stable or memoized properly
-- **State Update Patterns**: Separate state updates when they depend on each other to avoid conflicts
+- **EdgeToEdgeCanvas Pattern**: Use refs to break circular dependencies when passing callbacks between components
 
 ### Floating UI Implementation
 - **Drag Handling**: Use pointer events with proper offset calculations

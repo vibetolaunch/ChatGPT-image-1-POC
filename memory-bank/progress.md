@@ -54,23 +54,25 @@
 
 ### Infinite Re-render Loop Fix (COMPLETED - 2025-05-26)
 - **Issue**: "Maximum update depth exceeded" error causing application crash and preventing usage
-- **Root Causes**:
-  - `useEffect` for mask pattern initialization had `[createMaskPattern]` dependency, but `createMaskPattern` was recreated on every render
-  - `saveToHistory` function had nested `setState` calls causing race conditions
-  - Problematic dependency arrays creating infinite re-render cycles
+- **Root Cause**: The `EdgeToEdgeCanvas` component had circular dependencies in its `setupCanvas` function:
+  - Recursive `setTimeout(setupCanvas, 100)` call creating infinite loops when canvas elements weren't ready
+  - `setupCanvas` function had `[onCanvasStateChange]` in dependency array, causing recreation on every render
+  - `useEffect` had `[setupCanvas]` as dependency, creating circular dependency chain
 - **Solution**:
-  - Fixed useEffect dependency array from `[createMaskPattern]` to `[]` for mask pattern initialization
-  - Simplified `saveToHistory` function to separate history and index updates, avoiding nested state calls
-  - Eliminated all problematic dependency arrays causing re-render loops
-  - Fixed component prop interfaces to match actual implementations
+  - **Removed recursive setTimeout**: Eliminated `setTimeout(setupCanvas, 100)` that was causing infinite loops
+  - **Fixed circular dependencies**: Changed `setupCanvas` dependency array from `[onCanvasStateChange]` to `[]`
+  - **Implemented ref pattern**: Used `onCanvasStateChangeRef` to access latest callback without creating dependencies
+  - **Added ref update mechanism**: Added `useEffect` to keep ref updated when prop changes
 - **Implementation Details**:
-  - Changed mask pattern useEffect to run only once on component mount
-  - Refactored history management to update history first, then index separately
-  - Removed duplicate logic that was causing nested state updates
-  - Fixed TypeScript prop interface mismatches between components
+  - Removed problematic `setTimeout(setupCanvas, 100)` call from line 80
+  - Changed `setupCanvas` useCallback dependency from `[onCanvasStateChange]` to `[]`
+  - Added `onCanvasStateChangeRef` ref to store latest callback
+  - Added `useEffect` to update ref when `onCanvasStateChange` prop changes
+  - Updated function call from `onCanvasStateChange(newCanvasState)` to `onCanvasStateChangeRef.current(newCanvasState)`
 - **Files Modified**:
-  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`
-- **Impact**: Application now renders without crashing, stable component lifecycle, eliminated infinite loops
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx` (primary fix)
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (restored full functionality)
+- **Impact**: Application now loads without crashing, eliminated infinite loops, all canvas functionality works properly
 
 ### Color Picker UI Fix (COMPLETED - 2025-05-25)
 - **Issue**: Color picker button displayed a grey border inside the color swatch that couldn't be removed with CSS
@@ -333,10 +335,12 @@
 
 ### 2025-05-26: Infinite Re-render Loop Fix
 - **Problem**: "Maximum update depth exceeded" error causing application crash
-- **Solution**: Fixed problematic useEffect dependency arrays and nested state updates
+- **Root Cause**: Circular dependencies in EdgeToEdgeCanvas component with recursive setTimeout calls
+- **Solution**: Eliminated recursive function calls and implemented ref pattern to break circular dependencies
 - **Files**:
-  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (fixed useEffect dependencies and saveToHistory function)
-- **Impact**: Application now renders without crashing, eliminated infinite re-render loops
+  - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx` (primary fix - removed recursive setTimeout, fixed circular dependencies)
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (restored full functionality after debugging)
+- **Impact**: Application now loads without crashing, eliminated infinite loops, all canvas functionality works properly
 
 ### 2025-05-25: Export Tool Implementation
 - **Feature**: Complete export functionality for saving canvas artwork

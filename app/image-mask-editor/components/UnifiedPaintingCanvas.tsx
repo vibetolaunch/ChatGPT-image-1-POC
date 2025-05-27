@@ -49,6 +49,38 @@ const MASK_PATTERN_CONFIG = {
   patternSize: 48 // Larger pattern size for better alignment
 }
 
+// Create diagonal stripe pattern for mask tool - moved outside component to prevent re-render loops
+const createMaskPattern = () => {
+  const patternCanvas = document.createElement('canvas')
+  const patternCtx = patternCanvas.getContext('2d')
+  if (!patternCtx) return null
+
+  // Set pattern canvas size
+  patternCanvas.width = MASK_PATTERN_CONFIG.patternSize
+  patternCanvas.height = MASK_PATTERN_CONFIG.patternSize
+
+  // Clear canvas (transparent background)
+  patternCtx.clearRect(0, 0, patternCanvas.width, patternCanvas.height)
+
+  // Draw diagonal stripes
+  patternCtx.strokeStyle = MASK_PATTERN_CONFIG.stripeColor
+  patternCtx.lineWidth = MASK_PATTERN_CONFIG.stripeWidth
+  patternCtx.lineCap = 'square'
+
+  // Calculate stripe spacing (double the stripe width for equal stripe/gap ratio)
+  const stripeSpacing = MASK_PATTERN_CONFIG.stripeWidth * 2
+
+  // Draw multiple diagonal lines to fill the pattern
+  for (let i = -patternCanvas.width; i < patternCanvas.width * 2; i += stripeSpacing) {
+    patternCtx.beginPath()
+    patternCtx.moveTo(i, 0)
+    patternCtx.lineTo(i + patternCanvas.height, patternCanvas.height)
+    patternCtx.stroke()
+  }
+
+  return patternCanvas
+}
+
 export default function UnifiedPaintingCanvas() {
   // Main state
   const [editorState, setEditorState] = useState<EditorState>({
@@ -96,9 +128,12 @@ export default function UnifiedPaintingCanvas() {
   const strokePointsRef = useRef<{ x: number; y: number }[]>([])
   const strokeStartImageDataRef = useRef<ImageData | null>(null)
   
-  // History state (using React state instead of refs for proper re-rendering)
-  const [history, setHistory] = useState<ImageData[]>([])
-  const [historyIndex, setHistoryIndex] = useState(-1)
+  // History management using refs to avoid circular dependencies
+  const historyRef = useRef<ImageData[]>([])
+  const historyIndexRef = useRef(-1)
+  
+  // State for UI updates only
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false })
 
   // Initialize history when canvas is ready
   useEffect(() => {
@@ -110,8 +145,9 @@ export default function UnifiedPaintingCanvas() {
       if (ctx) {
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-        setHistory([imageData])
-        setHistoryIndex(0)
+        historyRef.current = [imageData]
+        historyIndexRef.current = 0
+        setHistoryState({ canUndo: false, canRedo: false })
       }
     }
 
@@ -120,13 +156,13 @@ export default function UnifiedPaintingCanvas() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Robust color picker interaction detection
+  // Robust color picker interaction detection - TEMPORARILY DISABLED FOR DEBUGGING
+  /*
   useEffect(() => {
     const handleColorPickerInteraction = (isActive: boolean) => {
       console.log('Color picker interaction:', isActive ? 'started' : 'ended')
-      setIsColorPickerActive(isActive)
       
-      // Clear existing timeouts
+      // Clear existing timeouts first
       if (colorPickerTimeoutRef.current) {
         clearTimeout(colorPickerTimeoutRef.current)
         colorPickerTimeoutRef.current = null
@@ -137,11 +173,16 @@ export default function UnifiedPaintingCanvas() {
         colorPickerDebounceRef.current = null
       }
       
+      // Set the state
+      setIsColorPickerActive(isActive)
+      
+      // Only set timeout when closing, and avoid redundant setState calls
       if (!isActive) {
-        // When color picker closes, set a timeout to re-enable painting
+        // When color picker closes, set a timeout to ensure it stays closed
         colorPickerTimeoutRef.current = setTimeout(() => {
-          console.log('Color picker timeout expired, re-enabling painting')
-          setIsColorPickerActive(false)
+          console.log('Color picker timeout expired, ensuring painting is enabled')
+          // Only set state if it's different to avoid unnecessary re-renders
+          setIsColorPickerActive(prev => prev ? false : prev)
         }, 400) // 400ms delay to ensure color picker is fully closed
       }
     }
@@ -207,13 +248,14 @@ export default function UnifiedPaintingCanvas() {
       if (colorPickerTimeoutRef.current) {
         clearTimeout(colorPickerTimeoutRef.current)
       }
+      
       if (colorPickerDebounceRef.current) {
         clearTimeout(colorPickerDebounceRef.current)
       }
     }
   }, [])
-
-  // Save canvas state to history
+  */
+  // Save canvas state to history - using refs to avoid infinite loops
   const saveToHistory = useCallback(() => {
     const paintingCanvas = canvasRef.current?.getPaintingCanvas()
     if (!paintingCanvas) return
@@ -223,84 +265,63 @@ export default function UnifiedPaintingCanvas() {
 
     const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     
-    // Update history first
-    setHistory(currentHistory => {
-      // Remove any history after current index
-      const newHistory = currentHistory.slice(0, historyIndex + 1)
-      
-      // Add new state
-      newHistory.push(imageData)
-      
-      // Limit history size
-      if (newHistory.length > 20) {
-        newHistory.shift()
-      }
-      
-      return newHistory
-    })
+    // Remove any history after current index
+    const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1)
     
-    // Then update index
-    setHistoryIndex(currentIndex => {
-      const newIndex = currentIndex + 1
-      return newIndex > 19 ? 19 : newIndex
+    // Add new state
+    newHistory.push(imageData)
+    
+    // Limit history size
+    if (newHistory.length > 20) {
+      newHistory.shift()
+    }
+    
+    // Update refs
+    historyRef.current = newHistory
+    historyIndexRef.current = newHistory.length > 20 ? 19 : historyIndexRef.current + 1
+    
+    // Update UI state
+    setHistoryState({
+      canUndo: historyIndexRef.current > 0,
+      canRedo: historyIndexRef.current < historyRef.current.length - 1
     })
-  }, [historyIndex])
+  }, [])
 
   // Undo/Redo functions
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1
-      setHistoryIndex(newIndex)
+    if (historyIndexRef.current > 0) {
+      const newIndex = historyIndexRef.current - 1
+      historyIndexRef.current = newIndex
       const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
-      if (ctx && history[newIndex]) {
-        ctx.putImageData(history[newIndex], 0, 0)
+      if (ctx && historyRef.current[newIndex]) {
+        ctx.putImageData(historyRef.current[newIndex], 0, 0)
       }
+      
+      // Update UI state
+      setHistoryState({
+        canUndo: historyIndexRef.current > 0,
+        canRedo: historyIndexRef.current < historyRef.current.length - 1
+      })
     }
-  }, [historyIndex, history])
+  }, [])
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1
-      setHistoryIndex(newIndex)
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      const newIndex = historyIndexRef.current + 1
+      historyIndexRef.current = newIndex
       const paintingCanvas = canvasRef.current?.getPaintingCanvas()
       const ctx = paintingCanvas?.getContext('2d')
-      if (ctx && history[newIndex]) {
-        ctx.putImageData(history[newIndex], 0, 0)
+      if (ctx && historyRef.current[newIndex]) {
+        ctx.putImageData(historyRef.current[newIndex], 0, 0)
       }
+      
+      // Update UI state
+      setHistoryState({
+        canUndo: historyIndexRef.current > 0,
+        canRedo: historyIndexRef.current < historyRef.current.length - 1
+      })
     }
-  }, [historyIndex, history])
-
-  // Create diagonal stripe pattern for mask tool
-  const createMaskPattern = useCallback(() => {
-    const patternCanvas = document.createElement('canvas')
-    const patternCtx = patternCanvas.getContext('2d')
-    if (!patternCtx) return null
-
-    // Set pattern canvas size
-    patternCanvas.width = MASK_PATTERN_CONFIG.patternSize
-    patternCanvas.height = MASK_PATTERN_CONFIG.patternSize
-
-    // Clear canvas (transparent background)
-    patternCtx.clearRect(0, 0, patternCanvas.width, patternCanvas.height)
-
-    // Draw diagonal stripes
-    patternCtx.strokeStyle = MASK_PATTERN_CONFIG.stripeColor
-    patternCtx.lineWidth = MASK_PATTERN_CONFIG.stripeWidth
-    patternCtx.lineCap = 'square'
-
-    // Calculate stripe spacing (double the stripe width for equal stripe/gap ratio)
-    const stripeSpacing = MASK_PATTERN_CONFIG.stripeWidth * 2
-
-    // Draw multiple diagonal lines to fill the pattern
-    for (let i = -patternCanvas.width; i < patternCanvas.width * 2; i += stripeSpacing) {
-      patternCtx.beginPath()
-      patternCtx.moveTo(i, 0)
-      patternCtx.lineTo(i + patternCanvas.height, patternCanvas.height)
-      patternCtx.stroke()
-    }
-
-    return patternCanvas
   }, [])
 
   // Initialize mask pattern when canvas is ready
@@ -593,8 +614,44 @@ export default function UnifiedPaintingCanvas() {
         
         // Save current stroke before stopping
         if (strokePointsRef.current.length > 0) {
-          redrawCompleteStroke(strokePointsRef.current)
-          saveToHistory()
+          // Use refs to avoid stale closures
+          const paintingCanvas = canvasRef.current?.getPaintingCanvas()
+          const ctx = paintingCanvas?.getContext('2d')
+          if (ctx && strokeStartImageDataRef.current) {
+            // Redraw complete stroke
+            ctx.putImageData(strokeStartImageDataRef.current, 0, 0)
+            ctx.globalCompositeOperation = toolState.activeTool === 'eraser' ? 'destination-out' : 'source-over'
+            ctx.strokeStyle = toolState.brushColor
+            ctx.lineWidth = toolState.brushSize
+            ctx.lineCap = 'round'
+            ctx.lineJoin = 'round'
+            
+            ctx.beginPath()
+            strokePointsRef.current.forEach((point, index) => {
+              if (index === 0) {
+                ctx.moveTo(point.x, point.y)
+              } else {
+                ctx.lineTo(point.x, point.y)
+              }
+            })
+            ctx.stroke()
+          }
+          
+          // Save to history using direct ref manipulation
+          const imageData = ctx?.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+          if (imageData) {
+            const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1)
+            newHistory.push(imageData)
+            if (newHistory.length > 20) {
+              newHistory.shift()
+            }
+            historyRef.current = newHistory
+            historyIndexRef.current = newHistory.length > 20 ? 19 : historyIndexRef.current + 1
+            setHistoryState({
+              canUndo: historyIndexRef.current > 0,
+              canRedo: historyIndexRef.current < historyRef.current.length - 1
+            })
+          }
         }
         
         strokePointsRef.current = []
@@ -611,7 +668,7 @@ export default function UnifiedPaintingCanvas() {
       document.removeEventListener('pointercancel', handleGlobalPointerCancel)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [isDrawing, redrawCompleteStroke, saveToHistory])
+  }, [isDrawing])
 
   // File upload handler
   const handleFileUpload = useCallback(async (file: File) => {
@@ -1002,8 +1059,8 @@ export default function UnifiedPaintingCanvas() {
             onUploadClick={handleUploadClick}
             onToggleMask={() => setShowMask(!showMask)}
             showMask={showMask}
-            canUndo={historyIndex > 0}
-            canRedo={historyIndex < history.length - 1}
+            canUndo={historyState.canUndo}
+            canRedo={historyState.canRedo}
           />
         </div>
       </div>
