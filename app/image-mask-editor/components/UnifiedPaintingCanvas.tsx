@@ -801,7 +801,7 @@ export default function UnifiedPaintingCanvas() {
     setShowAIModal(true)
   }, [])
 
-  const handleAIPromptSubmit = useCallback(async (prompt: string) => {
+  const handleAIPromptSubmit = useCallback(async (prompt: string, model?: string) => {
     if (!editorState.backgroundImage) {
       setError('Please upload a background image first')
       return
@@ -850,6 +850,9 @@ export default function UnifiedPaintingCanvas() {
       formData.append('maskData', maskDataUrl) // Use base64 data URL
       formData.append('prompt', prompt)
       formData.append('sessionId', user.id) // Use user ID as session ID
+      if (model) {
+        formData.append('model', model) // Add selected model
+      }
 
       // Call the API
       const response = await fetch('/api/mask-edit-image', {
@@ -859,7 +862,9 @@ export default function UnifiedPaintingCanvas() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate image')
+        const errorMessage = errorData.error || 'Failed to generate image'
+        const errorDetails = errorData.details ? ` Details: ${errorData.details}` : ''
+        throw new Error(errorMessage + errorDetails)
       }
 
       const result = await response.json()
@@ -890,9 +895,59 @@ export default function UnifiedPaintingCanvas() {
     try {
       setError(null)
 
-      // Create a new background image object from the AI result
-      // We'll use a temporary ID and path since this is a generated image
-      const tempId = `ai-generated-${Date.now()}`
+      // Get user and Supabase client
+      const supabase = createClientSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        throw new Error('You must be logged in to apply AI results')
+      }
+
+      // Download the AI result image
+      const response = await fetch(resultUrl)
+      if (!response.ok) {
+        throw new Error('Failed to download AI result image')
+      }
+      
+      const imageBlob = await response.blob()
+      const imageBuffer = await imageBlob.arrayBuffer()
+      
+      // Create regular user image filename
+      const timestamp = Date.now()
+      const fileName = `${user.id}/applied-ai-result-${timestamp}.png`
+      
+      // Upload to images bucket (not edited-images)
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, imageBuffer, { contentType: 'image/png' })
+      
+      if (uploadError) {
+        throw new Error(`Failed to upload AI result: ${uploadError.message}`)
+      }
+      
+      // Get the public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName)
+      
+      // Create database record
+      const { data: imageRecord, error: dbError } = await supabase
+        .from('images')
+        .insert({
+          user_id: user.id,
+          storage_path: fileName,
+          file_name: `applied-ai-result-${timestamp}.png`,
+          file_size: imageBuffer.byteLength,
+          mime_type: 'image/png'
+        })
+        .select()
+        .single()
+      
+      if (dbError) {
+        console.error('Database error (continuing anyway):', dbError)
+        console.error('Database error details:', JSON.stringify(dbError, null, 2))
+        // Continue even if database record fails - the image is uploaded
+      }
       
       // Get image dimensions
       const img = new Image()
@@ -904,13 +959,13 @@ export default function UnifiedPaintingCanvas() {
         img.onerror = reject
       })
 
-      // Update the background image with the AI result
+      // Update the background image with the regular path (not ai-generated/)
       setEditorState(prev => ({
         ...prev,
         backgroundImage: {
-          url: resultUrl,
-          path: `ai-generated/${tempId}`,
-          id: tempId,
+          url: publicUrl, // Use the uploaded image URL
+          path: fileName, // Use regular path, not ai-generated/
+          id: imageRecord?.id?.toString() || `uploaded-${timestamp}`,
           width: img.naturalWidth,
           height: img.naturalHeight
         }
@@ -923,6 +978,8 @@ export default function UnifiedPaintingCanvas() {
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
         saveToHistory()
       }
+
+      console.log('AI result successfully applied and converted to regular image:', fileName)
 
     } catch (err: any) {
       console.error('Apply to canvas error:', err)
@@ -1061,6 +1118,7 @@ export default function UnifiedPaintingCanvas() {
             showMask={showMask}
             canUndo={historyState.canUndo}
             canRedo={historyState.canRedo}
+            onAIGenerate={() => setShowAIModal(true)}
           />
         </div>
       </div>

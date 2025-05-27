@@ -52,6 +52,28 @@
 
 ## ✅ Recently Completed
 
+### Second AI Generation Error Fix (COMPLETED - 2025-05-26)
+- **Issue**: When users applied an AI-generated result to canvas and then tried to edit it again, the system would fail with "File not found with any extension" error
+- **Root Cause**: The `handleApplyToCanvas` function created temporary `ai-generated/ai-generated-{timestamp}` paths that didn't actually exist in Supabase storage. AI results were stored in `edited-images` bucket with provider-specific filenames, but the temporary paths were never uploaded to storage.
+- **User Impact**: Users could generate AI images and apply them once, but subsequent edits would fail, breaking the iterative editing workflow
+- **Solution**:
+  - **Convert AI Results to Regular Images**: When applying AI results to canvas, download the image and upload it to the `images` bucket as a regular user image
+  - **Proper Database Integration**: Create database records in the `images` table with correct schema fields (`file_name`, `mime_type`)
+  - **Unified Storage Pattern**: All images now follow the same storage pattern, eliminating special case handling
+  - **Simplified API Logic**: Removed complex bucket determination logic since all images use `images` bucket
+- **Implementation Details**:
+  - Modified `handleApplyToCanvas` to download AI result from URL using `fetch()`
+  - Upload image to `images` bucket with filename pattern: `{user.id}/applied-ai-result-{timestamp}.png`
+  - Create database record with proper schema: `file_name`, `mime_type`, `file_size`, `storage_path`
+  - Update canvas state with regular image path instead of temporary `ai-generated/` path
+  - Simplified API route bucket logic: all images use `images` bucket consistently
+  - Fixed database schema mismatch that was causing empty error objects
+  - Added comprehensive error handling and logging for debugging
+- **Files Modified**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Enhanced `handleApplyToCanvas` function
+  - `app/api/mask-edit-image/route.ts`: Simplified bucket logic and error handling
+- **Impact**: Users can now apply AI results and continue editing them multiple times without errors. The iterative AI editing workflow is fully functional.
+
 ### Infinite Re-render Loop Fix (COMPLETED - 2025-05-26)
 - **Issue**: "Maximum update depth exceeded" error causing application crash and preventing usage
 - **Root Cause**: The `EdgeToEdgeCanvas` component had circular dependencies in its `setupCanvas` function:
@@ -332,6 +354,15 @@
 - **Provider Accounts**: Active accounts with all AI services
 
 ## 🔄 Recent Changes Log
+
+### 2025-05-26: Second AI Generation Error Fix
+- **Problem**: "File not found with any extension" error when trying to edit AI-generated images multiple times
+- **Root Cause**: Temporary `ai-generated/` paths created by `handleApplyToCanvas` didn't exist in storage
+- **Solution**: Convert applied AI results to regular uploaded images with proper database records
+- **Files**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx` (enhanced handleApplyToCanvas function)
+  - `app/api/mask-edit-image/route.ts` (simplified bucket logic and error handling)
+- **Impact**: Iterative AI editing workflow now fully functional - users can apply and edit AI results multiple times
 
 ### 2025-05-26: Infinite Re-render Loop Fix
 - **Problem**: "Maximum update depth exceeded" error causing application crash
