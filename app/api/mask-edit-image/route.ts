@@ -58,15 +58,53 @@ export async function POST(request: Request) {
     // Get the appropriate provider
     const provider = ImageProviderFactory.getProvider(selectedModel);
 
-    // Fetch the original image from Supabase Storage
-    const { data: imageData, error: imageError } = await supabase.storage
-      .from('images')
-      .download(imagePath);
+    // All images now use the 'images' bucket since AI-generated images are converted to regular images when applied
+    const bucket = 'images';
+    
+    // Function to try downloading with different extensions
+    const tryDownload = async (path: string) => {
+      const extensions = ['', '.png', '.jpg', '.jpeg', '.webp'];
+      
+      for (const ext of extensions) {
+        const fullPath = path + ext;
+        console.log('Attempting to download image from path:', fullPath, 'in bucket:', bucket);
+        
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .download(fullPath);
+          
+        if (!error && data) {
+          console.log('Successfully downloaded from path:', fullPath);
+          return { data, error: null, actualPath: fullPath };
+        }
+        
+        console.log('Failed to download from path:', fullPath, 'Error:', error?.message);
+      }
+      
+      return { data: null, error: new Error('File not found with any extension'), actualPath: null };
+    };
+
+    // Try to fetch the original image from Supabase Storage
+    const { data: imageData, error: imageError, actualPath } = await tryDownload(imagePath);
 
     if (imageError || !imageData) {
-      console.error('Error fetching original image:', imageError);
-      return NextResponse.json({ error: 'Failed to fetch the original image' }, { status: 500 });
+      console.error('Error fetching original image:', {
+        imagePath,
+        bucket,
+        error: imageError,
+        errorMessage: imageError?.message
+      });
+      
+      const errorMessage = `Failed to fetch the original image: ${imageError?.message || 'Unknown error'}`;
+      
+      return NextResponse.json({
+        error: errorMessage,
+        imagePath: imagePath,
+        bucket: bucket
+      }, { status: 500 });
     }
+    
+    console.log('Successfully fetched image from:', actualPath);
 
     // Convert the image to PNG format
     const imageBuffer = await sharp(await imageData.arrayBuffer())
@@ -93,17 +131,18 @@ export async function POST(request: Request) {
       negativePrompt: formData.get('negativePrompt') as string || undefined,
     };
 
-    if (selectedModel === 'recraft') {
-      providerOptions.style = formData.get('style') as string || 'realistic_image';
-      providerOptions.model = 'recraftv3'; // Recraft specific internal model
-      // Add other Recraft specific options if any are sent via formData
-    } else if (selectedModel === 'stabilityai') {
+    if (selectedModel === 'stabilityai') {
       providerOptions.style = formData.get('style') as string || undefined; // Will map to style_preset
       providerOptions.cfgScale = formData.get('cfgScale') ? parseFloat(formData.get('cfgScale') as string) : undefined;
       providerOptions.steps = formData.get('steps') ? parseInt(formData.get('steps') as string, 10) : undefined;
       providerOptions.samples = formData.get('samples') ? parseInt(formData.get('samples') as string, 10) : undefined;
       providerOptions.seed = formData.get('seed') ? parseInt(formData.get('seed') as string, 10) : undefined;
       // model option in ImageEditParams can be used for engineId if needed, but provider uses its own config.
+    } else if (selectedModel === 'replicate') {
+      providerOptions.cfgScale = formData.get('cfgScale') ? parseFloat(formData.get('cfgScale') as string) : undefined;
+      providerOptions.steps = formData.get('steps') ? parseInt(formData.get('steps') as string, 10) : undefined;
+      providerOptions.seed = formData.get('seed') ? parseInt(formData.get('seed') as string, 10) : undefined;
+      providerOptions.negativePrompt = formData.get('negativePrompt') as string || undefined;
     }
     // For OpenAI, similar logic would apply if implemented
 
@@ -163,9 +202,9 @@ export async function POST(request: Request) {
       result_storage_path: img.editedImagePath,
       prompt: prompt,
       model_used: selectedModel,
-      model_version: selectedModel === 'stabilityai' 
-        ? (modelConfig as typeof imageModels.models.stabilityai).engineId 
-        : (selectedModel === 'recraft' ? 'v3' : 'gpt-image-1') // Fallback for others
+      model_version: selectedModel === 'stabilityai'
+        ? (modelConfig as typeof imageModels.models.stabilityai).engineId
+        : 'gpt-image-1' // Fallback for others
     }));
 
     const { error: dbError } = await supabase
@@ -188,6 +227,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error processing masked image:', error);
+    console.error('Error stack:', error.stack);
     
     // Enhanced error handling for different providers
     let errorMessage = error.message || 'Failed to process image';
@@ -196,15 +236,22 @@ export async function POST(request: Request) {
     if (error.message?.includes('API key is not configured')) {
       errorMessage = 'Service configuration error. Please contact support.';
       errorStatus = 503;
-    } else if (error.message?.includes('API error')) {
-      errorMessage = 'External service error. Please try again.';
+    } else if (error.message?.includes('API error') || error.message?.includes('Stability AI API error')) {
+      // Provide more specific error information for debugging
+      errorMessage = `External service error: ${error.message}. Please try again.`;
       errorStatus = 502;
     } else if (error.message?.includes('file size') || error.message?.includes('resolution') || error.message?.includes('dimensions')) {
       errorStatus = 400;
+    } else if (error.message?.includes('No images returned')) {
+      errorMessage = 'No images were generated by the AI service. Please try a different prompt or image.';
+      errorStatus = 422;
     }
 
     return NextResponse.json(
-      { error: errorMessage },
+      {
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: errorStatus }
     );
   }

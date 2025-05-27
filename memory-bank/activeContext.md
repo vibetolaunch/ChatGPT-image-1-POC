@@ -1,7 +1,7 @@
 # Active Context: Current Work Focus
 
 ## Current State
-The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by circular dependencies in EdgeToEdgeCanvas component. **Mouse Tracking Bug Fix Completed**: Fixed critical drawing bug where releasing mouse outside canvas would cause unwanted drawing when returning to canvas.
+The project is a functional AI image editing POC with mask-based editing capabilities. **Major UI Redesign Completed**: Implemented floating draggable toolbar and edge-to-edge canvas layout for a modern, professional image editing experience. **Apply to Canvas Fix Completed**: Fixed critical bug where AI-generated results couldn't be applied to the canvas. **Drag Performance Optimization Completed**: Fixed laggy dragging behavior in floating toolbar with requestAnimationFrame and optimized DOM queries. **Auto-Repositioning Feature Completed**: Added intelligent repositioning when expanding toolbar to prevent off-screen content. **Canvas Resize Content Preservation Fix Completed**: Fixed issue where canvas content was wiped during browser window resize. **Undo/Redo Functionality Fix Completed**: Fixed non-functional redo button by converting history management from refs to React state. **Infinite Re-render Loop Fix Completed**: Fixed critical "Maximum update depth exceeded" error caused by circular dependencies in EdgeToEdgeCanvas component. **Mouse Tracking Bug Fix Completed**: Fixed critical drawing bug where releasing mouse outside canvas would cause unwanted drawing when returning to canvas. **Second AI Generation Error Fix Completed**: Fixed critical "File not found" error when trying to edit AI-generated images multiple times by converting applied AI results to regular uploaded images.
 
 ## Recent Focus Areas
 
@@ -212,7 +212,35 @@ The project is a functional AI image editing POC with mask-based editing capabil
   - `app/image-mask-editor/components/EdgeToEdgeCanvas.tsx`: Added onPointerLeave prop support
 - **Impact**: Drawing now behaves naturally - stops when mouse is released anywhere, no unwanted drawing when returning to canvas
 
-### 11. **Previous Fixes Maintained**
+### 11. **Second AI Generation Error Fix (COMPLETED - 2025-05-26)**
+- **Issue**: When users applied an AI-generated result to canvas and then tried to edit it again, the system would fail with "File not found with any extension" error
+- **Root Cause**: The `handleApplyToCanvas` function created temporary `ai-generated/ai-generated-{timestamp}` paths that didn't actually exist in Supabase storage. AI results were stored in `edited-images` bucket with provider-specific filenames, but the temporary paths were never uploaded to storage.
+- **User Impact**: Users could generate AI images and apply them once, but subsequent edits would fail, breaking the iterative editing workflow
+- **Solution**:
+  - **Convert AI Results to Regular Images**: When applying AI results to canvas, download the image and upload it to the `images` bucket as a regular user image
+  - **Proper Database Integration**: Create database records in the `images` table with correct schema fields (`file_name`, `mime_type`)
+  - **Unified Storage Pattern**: All images now follow the same storage pattern, eliminating special case handling
+  - **Simplified API Logic**: Removed complex bucket determination logic since all images use `images` bucket
+- **Implementation Details**:
+  - Modified `handleApplyToCanvas` to download AI result from URL using `fetch()`
+  - Upload image to `images` bucket with filename pattern: `{user.id}/applied-ai-result-{timestamp}.png`
+  - Create database record with proper schema: `file_name`, `mime_type`, `file_size`, `storage_path`
+  - Update canvas state with regular image path instead of temporary `ai-generated/` path
+  - Simplified API route bucket logic: all images use `images` bucket consistently
+  - Fixed database schema mismatch that was causing empty error objects
+  - Added comprehensive error handling and logging for debugging
+- **Files Modified**:
+  - `app/image-mask-editor/components/UnifiedPaintingCanvas.tsx`: Enhanced `handleApplyToCanvas` function
+  - `app/api/mask-edit-image/route.ts`: Simplified bucket logic and error handling
+- **Impact**: Users can now apply AI results and continue editing them multiple times without errors. The iterative AI editing workflow is fully functional.
+- **Benefits**:
+  - **Consistency**: All images follow the same storage and database patterns
+  - **Reliability**: No more missing file errors for subsequent edits
+  - **Traceability**: Applied AI results are properly tracked in the database
+  - **Simplicity**: Removed special case handling complexity
+  - **User Experience**: Seamless editing workflow without interruptions
+
+### 12. **Previous Fixes Maintained**
 - **File Upload Dialog Fix**: Preserved solution preventing unintended upload dialogs
 - **Canvas Layering**: Maintained transparent painting layer over background images
 - **Provider Integration**: All existing AI provider functionality intact
@@ -305,6 +333,16 @@ The project is a functional AI image editing POC with mask-based editing capabil
 - **Canvas Management**: Clear painting canvas after applying edits
 - **History Integration**: Save state changes for undo functionality
 - **Error Handling**: Graceful handling of image loading failures
+
+### AI Result Storage and Conversion Implementation
+- **Download and Re-upload Pattern**: Download AI results from URLs and upload as regular user images to ensure consistent storage
+- **Database Schema Compliance**: Use correct field names (`file_name`, `mime_type`) that match the database schema
+- **Unified Storage Strategy**: Convert temporary AI paths to regular image paths to eliminate special case handling
+- **Error Handling**: Continue operation even if database record creation fails, since image upload is the critical operation
+- **Path Consistency**: Use regular user image paths (`{user.id}/applied-ai-result-{timestamp}.png`) instead of temporary `ai-generated/` paths
+- **Bucket Simplification**: All images use the same `images` bucket, eliminating complex bucket determination logic
+- **Iterative Workflow Support**: Ensure applied AI results can be found and edited multiple times
+- **Debugging Support**: Add comprehensive logging for troubleshooting storage and database issues
 
 ### Infinite Re-render Loop Prevention
 - **Circular Dependencies**: Avoid circular dependencies between useCallback and useEffect hooks
