@@ -6,7 +6,7 @@ import { addTokens } from '../../../lib/tokenService';
 export async function POST(request: Request) {
   try {
     const body = await request.text();
-    const signature = headers().get('stripe-signature') || '';
+    const signature = (await headers()).get('stripe-signature') || '';
 
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
       throw new Error('Missing Stripe webhook secret');

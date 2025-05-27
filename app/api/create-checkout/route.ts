@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const amount = tokenCount * unitPrice;
     
     // Get the host from the request headers
-    const headersList = headers();
+    const headersList = await headers();
     const host = headersList.get('host') || 'localhost:3000';
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;

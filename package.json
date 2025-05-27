@@ -1,13 +1,56 @@
 {
-  "name": "chatgpt-image-editor-poc",
-  "version": "0.1.0",
-  "private": true,
+  "name": "ipaintai",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Advanced AI-powered image editing with ChatGPT-image-1, Stability AI, and Recraft AI integration",
+  "keywords": [
+    "ai",
+    "image-editing",
+    "chatgpt",
+    "stability-ai",
+    "recraft",
+    "nextjs",
+    "typescript",
+    "supabase",
+    "canvas",
+    "mask-editing"
+  ],
+  "homepage": "https://github.com/your-username/ipaintai#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ipaintai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/ipaintai/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "iPaintAI Contributors",
+    "url": "https://github.com/your-username/ipaintai/graphs/contributors"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:migrate": "node lib/supabase/migrate.js"
+    "lint:fix": "next lint --fix",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "node lib/supabase/migrate.js",
+    "db:reset": "node lib/supabase/migrate.js --reset",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:watch": "echo \"Error: no test specified\" && exit 1",
+    "test:coverage": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky install || true",
+    "security:audit": "npm audit",
+    "security:fix": "npm audit fix",
+    "deps:update": "npm update",
+    "deps:check": "npm outdated"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
   "dependencies": {
     "@rive-app/react-canvas": "^4.20.1",
@@ -22,6 +65,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.3.8",
+    "replicate": "^1.0.1",
     "sharp": "^0.34.1",
     "stripe": "^14.25.0",
     "tldraw": "^3.13.1",

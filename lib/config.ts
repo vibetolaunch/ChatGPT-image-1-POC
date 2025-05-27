@@ -20,12 +20,12 @@ export const supabaseConfig = {
 
 // Image model configuration
 export const imageModels = {
-  default: 'stabilityai', // Changed back to Stability AI as requested
+  default: 'stabilityai', // Default to Stability AI
   models: {
     stabilityai: {
       name: 'Stability AI',
       provider: 'stabilityai' as const,
-      endpoint: 'https://api.stability.ai', 
+      endpoint: 'https://api.stability.ai',
       engineId: 'stable-diffusion-xl-1024-v1-0', // Changed to a more common engine for img2img
       apiKey: process.env.STABILITY_API_KEY,
       maxImages: 5,
@@ -37,31 +37,24 @@ export const imageModels = {
       maxDimension: 2048,
       supportedFormats: ['png', 'jpeg', 'webp'] as const,
       maskFormat: 'grayscale' as const,
-      supportedStylePresets: [ 
-        'enhance', 'anime', 'photographic', 'digital-art', 'comic-book', 
-        'fantasy-art', 'line-art', 'analog-film', 'neon-punk', 'isometric', 
+      supportedStylePresets: [
+        'enhance', 'anime', 'photographic', 'digital-art', 'comic-book',
+        'fantasy-art', 'line-art', 'analog-film', 'neon-punk', 'isometric',
         'low-poly', 'origami', 'modeling-compound', 'cinematic', '3d-model', 'pixel-art'
       ] as const,
       defaultStylePreset: 'photographic',
     },
-    recraft: {
-      name: 'Recraft AI',
-      provider: 'recraft' as const,
-      endpoint: 'https://external.api.recraft.ai/v1',
+    replicate: {
+      name: 'Replicate AI',
+      provider: 'replicate' as const,
+      endpoint: 'https://api.replicate.com',
+      model: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+      apiKey: process.env.REPLICATE_API_TOKEN,
       maxImages: 1,
-      maxFileSize: 5 * 1024 * 1024, // 5MB
-      maxResolution: 16 * 1024 * 1024, // 16MP
-      maxDimension: 4096,
-      minDimension: 256,
-      supportedFormats: ['png', 'jpg', 'webp'] as const,
-      maskFormat: 'grayscale' as const, // Key difference from OpenAI
-      supportedSizes: [
-        '1024x1024', '1365x1024', '1024x1365', '1536x1024', '1024x1536',
-        '1820x1024', '1024x1820', '1024x2048', '2048x1024', '1434x1024',
-        '1024x1434', '1024x1280', '1280x1024', '1024x1707', '1707x1024'
-      ] as const,
-      defaultStyle: 'realistic_image',
-      apiKey: process.env.RECRAFT_API_KEY
+      maxFileSize: 10 * 1024 * 1024, // 10MB
+      supportedFormats: ['png', 'jpeg', 'webp'] as const,
+      maskFormat: 'grayscale' as const,
+      timeout: 60000, // 60 seconds
     },
     openai: {
       name: 'OpenAI GPT-Image-1',
