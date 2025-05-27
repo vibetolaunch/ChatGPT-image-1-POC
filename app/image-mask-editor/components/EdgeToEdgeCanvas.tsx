@@ -62,6 +62,12 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
     displayWidth: CANVAS_WIDTH,
     displayHeight: CANVAS_HEIGHT
   })
+  const onCanvasStateChangeRef = useRef(onCanvasStateChange)
+  
+  // Update ref when prop changes
+  useEffect(() => {
+    onCanvasStateChangeRef.current = onCanvasStateChange
+  }, [onCanvasStateChange])
 
   // Expose canvas refs and state through imperative handle
   useImperativeHandle(ref, () => ({
@@ -77,7 +83,7 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
     const paintingCanvas = paintingCanvasRef.current
 
     if (!container || !backgroundCanvas || !paintingCanvas) {
-      setTimeout(setupCanvas, 100)
+      // Don't call setupCanvas recursively - this causes infinite loops
       return
     }
 
@@ -124,7 +130,7 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
 
     const newCanvasState = { scale, offsetX, offsetY, displayWidth, displayHeight }
     canvasStateRef.current = newCanvasState
-    onCanvasStateChange(newCanvasState)
+    onCanvasStateChangeRef.current(newCanvasState)
 
     // Restore both canvas contents after resize
     if (backgroundCtx && backgroundImageData) {
@@ -133,7 +139,7 @@ const EdgeToEdgeCanvas = forwardRef<EdgeToEdgeCanvasRef, EdgeToEdgeCanvasProps>(
     if (paintingCtx && paintingImageData) {
       paintingCtx.putImageData(paintingImageData, 0, 0)
     }
-  }, [onCanvasStateChange])
+  }, [])
 
   // Setup canvas on mount and window resize
   useEffect(() => {

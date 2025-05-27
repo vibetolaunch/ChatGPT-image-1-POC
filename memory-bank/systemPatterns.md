@@ -264,3 +264,49 @@ setHistoryIndex(currentIndex => newIndex)
 - **useCallback**: Memoize functions only when dependencies actually change
 - **State Management**: Use React state for UI-affecting values, refs for non-UI values
 - **Error Detection**: "Maximum update depth exceeded" indicates infinite loops
+
+### EdgeToEdgeCanvas Circular Dependency Fix
+**Critical Pattern**: Avoid recursive function calls and circular dependencies in React hooks
+
+**Problem**: Infinite loops from recursive setTimeout and circular dependencies
+```typescript
+// ❌ WRONG - causes infinite loops
+const setupCanvas = useCallback(() => {
+  // ... setup logic
+  if (!canvasReady) {
+    setTimeout(setupCanvas, 100) // Recursive call creates infinite loop
+  }
+  onCanvasStateChange(newState) // Function in dependency array
+}, [onCanvasStateChange]) // Dependency causes recreation on every render
+
+useEffect(() => {
+  setupCanvas()
+}, [setupCanvas]) // Circular dependency: setupCanvas depends on onCanvasStateChange, effect depends on setupCanvas
+```
+
+**Solution**: Use refs to break circular dependencies and eliminate recursive calls
+```typescript
+// ✅ CORRECT - stable dependencies and no recursion
+const onCanvasStateChangeRef = useRef(onCanvasStateChange)
+
+// Update ref when prop changes
+useEffect(() => {
+  onCanvasStateChangeRef.current = onCanvasStateChange
+}, [onCanvasStateChange])
+
+const setupCanvas = useCallback(() => {
+  // ... setup logic
+  // No recursive setTimeout call
+  onCanvasStateChangeRef.current(newState) // Use ref to access latest callback
+}, []) // Empty dependency array - function is stable
+
+useEffect(() => {
+  setupCanvas()
+}, []) // Run once on mount, no circular dependencies
+```
+
+**Key Principles**:
+- Never use recursive setTimeout/setInterval calls in React components
+- Use refs to access latest prop values without creating dependencies
+- Keep useCallback dependency arrays minimal and stable
+- Avoid circular dependencies between useCallback and useEffect
